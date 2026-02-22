@@ -1,14 +1,33 @@
-import React, { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/api'
 
 function LiveInterview() {
+  // Step management
+  const [step, setStep] = useState('setup') // setup, interview, results
+  
+  // Setup state
+  const [resume, setResume] = useState(null)
+  const [jobDescription, setJobDescription] = useState('')
+  const [numQuestions, setNumQuestions] = useState(5)
+  const [isGenerating, setIsGenerating] = useState(false)
+  
+  // Interview state
+  const [aiSessionId, setAiSessionId] = useState(null)
+  const [questions, setQuestions] = useState([])
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [answers, setAnswers] = useState([])
+  
+  // Recording state
   const [isRecording, setIsRecording] = useState(false)
   const [metrics, setMetrics] = useState(null)
   const [duration, setDuration] = useState(0)
   const [isSaving, setIsSaving] = useState(false)
   const [sessionId, setSessionId] = useState(null)
   const [wsConnected, setWsConnected] = useState(false)
+  
+  // Results state
+  const [overallResults, setOverallResults] = useState(null)
   
   const videoRef = useRef(null)
   const wsRef = useRef(null)
@@ -21,80 +40,132 @@ function LiveInterview() {
   
   const navigate = useNavigate()
 
-  const startRecording = async () => {
+  const handleStartInterview = async (e) => {
+    e.preventDefault()
+    
+    if (!resume || !jobDescription.trim()) {
+      alert('Please upload a resume and provide a job description')
+      return
+    }
+    
+    setIsGenerating(true)
+    
     try {
-      // Check if browser supports required APIs
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert('Your browser does not support camera/microphone access. Please use a modern browser like Chrome, Firefox, or Edge.')
-        return
+      const formData = new FormData()
+      formData.append('resume', resume)
+      formData.append('job_description', jobDescription)
+      formData.append('num_questions', numQuestions)
+      
+      const response = await api.post('/ai-interview/start', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      
+      if (response.data.success) {
+        setAiSessionId(response.data.session_id)
+        setQuestions(response.data.questions)
+        setStep('interview')
       }
+    } catch (error) {
+      console.error('Error starting interview:', error)
+      alert(error.response?.data?.detail || 'Failed to start interview')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
 
-      // Get media stream with better error handling
-      let stream
+  const startInterview = async () => {
+    try {
+      // Try to get camera and microphone
+      let stream = null
       try {
         stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { 
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          }, 
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true
-          }
+          video: { width: { ideal: 1280 }, height: { ideal: 720 } }, 
+          audio: { echoCancellation: true, noiseSuppression: true }
         })
+        
+        streamRef.current = stream
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+        }
+
+        // Generate session ID for facial analysis
+        const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        setSessionId(newSessionId)
+
+        // Setup WebSocket for facial analysis
+        try {
+          wsRef.current = new WebSocket('ws://localhost:8000/api/live')
+          wsRef.current.onopen = () => {
+            setWsConnected(true)
+            wsRef.current.send(JSON.stringify({
+              type: 'init',
+              session_id: newSessionId,
+              start_time: Date.now()
+            }))
+          }
+          wsRef.current.onmessage = (event) => {
+            const data = JSON.parse(event.data)
+            if (data.type === 'metrics') {
+              setMetrics(data.data)
+            }
+          }
+          wsRef.current.onerror = () => {
+            console.log('WebSocket error - continuing without facial analysis')
+          }
+        } catch (wsError) {
+          console.log('Could not connect WebSocket - continuing without facial analysis')
+        }
+
+        // Send video frames if WebSocket connected
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+        frameIntervalRef.current = setInterval(() => {
+          if (videoRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
+            canvas.width = videoRef.current.videoWidth
+            canvas.height = videoRef.current.videoHeight
+            ctx.drawImage(videoRef.current, 0, 0)
+            wsRef.current.send(JSON.stringify({ frame: canvas.toDataURL('image/jpeg', 0.8) }))
+          }
+        }, 200)
       } catch (mediaError) {
         console.error('Media access error:', mediaError)
-        if (mediaError.name === 'NotAllowedError' || mediaError.name === 'PermissionDeniedError') {
-          alert('Camera/microphone access denied. Please allow permissions in your browser settings and try again.')
-        } else if (mediaError.name === 'NotFoundError' || mediaError.name === 'DevicesNotFoundError') {
-          alert('No camera or microphone found. Please connect a camera/microphone and try again.')
-        } else if (mediaError.name === 'NotReadableError' || mediaError.name === 'TrackStartError') {
-          alert('Camera/microphone is already in use by another application. Please close other apps and try again.')
-        } else {
-          alert(`Could not access camera/microphone: ${mediaError.message}`)
+        const proceed = confirm(
+          'Could not access camera/microphone. This may be because:\n\n' +
+          '• Permissions were denied\n' +
+          '• No camera/microphone is connected\n' +
+          '• Another app is using them\n\n' +
+          'Continue without video? (Audio-only interview)'
+        )
+        
+        if (!proceed) {
+          return
         }
-        return
-      }
-      
-      streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
+        
+        // Continue without video - audio only
+        console.log('Continuing in audio-only mode')
       }
 
-      // Generate session ID
-      const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-      console.log('Generated session ID:', newSessionId)
-      setSessionId(newSessionId)
+      // Start recording first question
       startTimeRef.current = Date.now()
+      startQuestionRecording()
+      
+    } catch (error) {
+      console.error('Error starting interview:', error)
+      alert('Failed to start interview: ' + error.message)
+    }
+  }
 
-      // Setup audio recording
-      audioChunksRef.current = []
-      
-      // Check for supported MIME types with better fallbacks
-      let mimeType = 'audio/webm;codecs=opus'
-      const supportedTypes = [
-        'audio/webm;codecs=opus',
-        'audio/webm',
-        'audio/ogg;codecs=opus',
-        'audio/mp4',
-        'audio/mpeg',
-        ''  // Empty string means use browser default
-      ]
-      
-      for (const type of supportedTypes) {
-        if (type === '' || MediaRecorder.isTypeSupported(type)) {
-          mimeType = type
-          console.log('Using MIME type:', mimeType || 'browser default')
-          break
-        }
-      }
-      
+  const startQuestionRecording = () => {
+    audioChunksRef.current = []
+    if (!startTimeRef.current) {
+      startTimeRef.current = Date.now()
+    }
+    
+    // Only setup MediaRecorder if we have a stream
+    if (streamRef.current) {
       try {
-        if (mimeType) {
-          mediaRecorderRef.current = new MediaRecorder(stream, { mimeType })
-        } else {
-          mediaRecorderRef.current = new MediaRecorder(stream)
-        }
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm'
+        mediaRecorderRef.current = new MediaRecorder(streamRef.current, { mimeType })
         
         mediaRecorderRef.current.ondataavailable = (event) => {
           if (event.data.size > 0) {
@@ -102,236 +173,151 @@ function LiveInterview() {
           }
         }
         
-        mediaRecorderRef.current.start(1000) // Collect data every second
-        console.log('✅ Audio recording started')
-      } catch (recorderError) {
-        console.error('MediaRecorder error:', recorderError)
-        alert('Audio recording is not supported in your browser. The interview will continue without audio analysis.')
-        // Continue without audio recording
-        mediaRecorderRef.current = null
+        mediaRecorderRef.current.start(1000)
+      } catch (error) {
+        console.error('Could not start MediaRecorder:', error)
       }
+    }
+    
+    setIsRecording(true)
+    setDuration(0)
+    
+    timerIntervalRef.current = setInterval(() => {
+      setDuration(Math.floor((Date.now() - startTimeRef.current) / 1000))
+    }, 1000)
+  }
 
-      // Connect to WebSocket for real-time facial analysis
-      try {
-        console.log('🔌 Attempting WebSocket connection to: ws://localhost:8000/api/live')
-        wsRef.current = new WebSocket('ws://localhost:8000/api/live')
-        
-        wsRef.current.onopen = () => {
-          console.log('✅ WebSocket connected successfully')
-          setWsConnected(true)
-          // Initialize session
-          const initMessage = {
-            type: 'init',
-            session_id: newSessionId,
-            start_time: startTimeRef.current
-          }
-          console.log('📤 Sending init message:', initMessage)
-          wsRef.current.send(JSON.stringify(initMessage))
-        }
-        
-        wsRef.current.onmessage = (event) => {
-          const data = JSON.parse(event.data)
-          console.log('📥 WebSocket message received:', data.type)
-          if (data.type === 'metrics') {
-            setMetrics(data.data)
-          } else if (data.type === 'init_ack') {
-            console.log('✅ Session initialized on backend:', data.session_id)
-          }
-        }
-
-        wsRef.current.onerror = (error) => {
-          console.error('❌ WebSocket error:', error)
-          console.log('⚠️ Continuing without real-time facial analysis')
-          setWsConnected(false)
-        }
-
-        wsRef.current.onclose = (event) => {
-          console.log('🔌 WebSocket closed. Code:', event.code, 'Reason:', event.reason)
-          setWsConnected(false)
-        }
-      } catch (wsError) {
-        console.error('Failed to create WebSocket:', wsError)
-        console.log('⚠️ Continuing without real-time facial analysis')
-      }
-
-      setIsRecording(true)
+  const finishQuestion = async () => {
+    if (duration < 5) {
+      alert('Please answer for at least 5 seconds')
+      return
+    }
+    
+    // Stop recording
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current)
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop()
+    }
+    setIsRecording(false)
+    
+    // Wait for audio chunks
+    await new Promise(resolve => setTimeout(resolve, 500))
+    
+    // Submit answer
+    setIsSaving(true)
+    try {
+      // If no audio was recorded, create a dummy answer
+      let answerText = `Sample answer for question ${currentQuestionIndex + 1}`
       
-      // Start timer
-      timerIntervalRef.current = setInterval(() => {
-        setDuration(Math.floor((Date.now() - startTimeRef.current) / 1000))
-      }, 1000)
-      
-      // Send frames periodically if WebSocket is connected
-      try {
-        const canvas = document.createElement('canvas')
-        const ctx = canvas.getContext('2d')
+      if (audioChunksRef.current.length > 0) {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        const formData = new FormData()
+        formData.append('session_id', aiSessionId)
+        formData.append('question_index', currentQuestionIndex)
+        formData.append('answer_audio', audioBlob, 'answer.webm')
+        formData.append('answer_duration', duration)
         
-        if (ctx) {
-          const sendFrame = () => {
-            if (!videoRef.current || videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) {
-              return
-            }
-            
-            if (wsRef.current?.readyState === WebSocket.OPEN) {
-              canvas.width = videoRef.current.videoWidth
-              canvas.height = videoRef.current.videoHeight
-              ctx.drawImage(videoRef.current, 0, 0)
-              
-              const frameData = canvas.toDataURL('image/jpeg', 0.8)
-              wsRef.current.send(JSON.stringify({ frame: frameData }))
-            }
+        const response = await api.post('/ai-interview/submit-answer', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        })
+        
+        if (response.data.success) {
+          const newAnswer = {
+            question: questions[currentQuestionIndex].question,
+            answer: response.data.answer_text,
+            score: response.data.analysis.score,
+            feedback: response.data.analysis.feedback,
+            metrics: response.data.analysis.metrics
           }
-          
-          frameIntervalRef.current = setInterval(sendFrame, 200)
+          setAnswers([...answers, newAnswer])
         }
-      } catch (canvasError) {
-        console.error('Failed to setup canvas:', canvasError)
-        console.log('⚠️ Continuing without frame capture')
+      } else {
+        // No audio - submit text answer
+        const formData = new FormData()
+        formData.append('session_id', aiSessionId)
+        formData.append('question_index', currentQuestionIndex)
+        formData.append('answer_text', answerText)
+        formData.append('answer_duration', duration)
+        
+        const response = await api.post('/ai-interview/submit-answer', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        })
+        
+        if (response.data.success) {
+          const newAnswer = {
+            question: questions[currentQuestionIndex].question,
+            answer: response.data.answer_text,
+            score: response.data.analysis.score,
+            feedback: response.data.analysis.feedback,
+            metrics: response.data.analysis.metrics
+          }
+          setAnswers([...answers, newAnswer])
+        }
       }
       
-    } catch (err) {
-      console.error('Error starting recording:', err)
-      alert('An unexpected error occurred. Please try again.')
+      // Move to next question or finish
+      if (currentQuestionIndex < questions.length - 1) {
+        setCurrentQuestionIndex(currentQuestionIndex + 1)
+        setTimeout(() => startQuestionRecording(), 1000)
+      } else {
+        finishInterview()
+      }
+    } catch (error) {
+      console.error('Error submitting answer:', error)
+      alert('Failed to submit answer: ' + (error.response?.data?.detail || error.message))
+    } finally {
+      setIsSaving(false)
     }
   }
 
-  const stopRecording = () => {
-    console.log('⏹️ Stopping recording...')
-    // Stop all intervals
-    if (frameIntervalRef.current) {
-      clearInterval(frameIntervalRef.current)
-      frameIntervalRef.current = null
-    }
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current)
-      timerIntervalRef.current = null
-    }
-    
-    // Stop media recorder
+  const finishInterview = async () => {
+    // Stop everything
+    if (frameIntervalRef.current) clearInterval(frameIntervalRef.current)
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current)
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      try {
-        mediaRecorderRef.current.stop()
-        console.log('🎤 Audio recording stopped')
-      } catch (e) {
-        console.log('Audio recorder already stopped')
-      }
+      mediaRecorderRef.current.stop()
     }
-    
-    // Stop stream
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop())
-      console.log('📹 Camera stream stopped')
     }
-    
-    // Close WebSocket
-    if (wsRef.current) {
-      if (wsRef.current.readyState === WebSocket.OPEN) {
-        console.log('🔌 Closing WebSocket connection...')
-        wsRef.current.close()
-      }
-      wsRef.current = null
-    }
+    if (wsRef.current) wsRef.current.close()
     
     setIsRecording(false)
     setWsConnected(false)
-    console.log('✅ Recording stopped successfully')
-  }
-
-  const saveInterview = async () => {
-    if (!sessionId) {
-      alert('No session to save')
-      return
-    }
-
-    setIsSaving(true)
     
+    // Get final results
     try {
-      // Wait longer for WebSocket disconnect to complete on backend
-      console.log('Waiting for session to finalize...')
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      console.log('Completing interview for session:', aiSessionId)
       
-      // Create audio blob
-      const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-      console.log('Audio blob size:', audioBlob.size, 'bytes')
+      const response = await api.post('/ai-interview/complete', {
+        session_id: aiSessionId
+      })
       
-      // Prepare form data
-      const formData = new FormData()
-      formData.append('session_id', sessionId)
-      formData.append('duration', duration.toString())
+      console.log('Complete response:', response.data)
       
-      if (audioBlob.size > 0) {
-        formData.append('audio_file', audioBlob, 'interview_audio.webm')
+      if (response.data.success) {
+        setOverallResults(response.data.overall_results)
+        setAnswers(response.data.detailed_answers)
+        setStep('results')
       }
-      
-      console.log('Sending save request for session:', sessionId)
-      
-      // Send to backend with retry logic
-      let retries = 3
-      let response = null
-      
-      while (retries > 0) {
-        try {
-          response = await api.post('/live/save', formData, {
-            headers: {
-              'Content-Type': 'multipart/form-data'
-            },
-            timeout: 30000 // 30 second timeout
-          })
-          break // Success, exit retry loop
-        } catch (error) {
-          retries--
-          if (retries > 0) {
-            console.log(`Save failed, retrying... (${retries} attempts left)`)
-            await new Promise(resolve => setTimeout(resolve, 1000))
-          } else {
-            throw error
-          }
-        }
-      }
-      
-      if (response && response.data.success) {
-        console.log('Interview saved successfully:', response.data.interview_id)
-        // Navigate to results page
-        navigate(`/results/${response.data.interview_id}`)
-      } else {
-        const errorMsg = response?.data?.error || 'Unknown error'
-        console.error('Save failed:', errorMsg)
-        alert('Failed to save interview: ' + errorMsg)
-      }
-      
     } catch (error) {
-      console.error('Error saving interview:', error)
-      if (error.response) {
-        alert(`Failed to save interview: ${error.response.data?.error || error.message}`)
-      } else if (error.request) {
-        alert('Failed to save interview: No response from server. Please check if the backend is running.')
-      } else {
-        alert('Failed to save interview: ' + error.message)
-      }
-    } finally {
-      setIsSaving(false)
-      // Reset state
-      setSessionId(null)
-      setDuration(0)
-      setMetrics(null)
-      audioChunksRef.current = []
+      console.error('Error completing interview:', error)
+      console.error('Error response:', error.response?.data)
+      alert('Failed to get results: ' + (error.response?.data?.detail || error.message))
     }
   }
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+    return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
   useEffect(() => {
     return () => {
-      // Cleanup on unmount
       if (frameIntervalRef.current) clearInterval(frameIntervalRef.current)
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current)
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop())
-      }
+      if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop())
       if (wsRef.current) wsRef.current.close()
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop()
@@ -341,14 +327,17 @@ function LiveInterview() {
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
-      {/* Cache buster: 20260220-1610 */}
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">Live Interview Mode (v2.0)</h2>
+        <h2 className="text-xl font-semibold">
+          {step === 'setup' && '🎯 AI-Powered Live Interview'}
+          {step === 'interview' && '🎤 Live Interview in Progress'}
+          {step === 'results' && '📊 Interview Results'}
+        </h2>
         <div className="flex items-center gap-4">
-          {wsConnected && (
+          {wsConnected && step === 'interview' && (
             <div className="flex items-center gap-2 text-sm text-green-600">
               <div className="w-2 h-2 bg-green-600 rounded-full"></div>
-              <span>Ready</span>
+              <span>Camera Active</span>
             </div>
           )}
           {isRecording && (
@@ -360,114 +349,260 @@ function LiveInterview() {
         </div>
       </div>
       
-      <div className="space-y-4">
-        <div className="relative bg-gray-900 rounded-lg overflow-hidden" style={{ height: '400px' }}>
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-full object-cover"
-          />
-          {!isRecording && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75">
+      {/* Setup Step */}
+      {step === 'setup' && (
+        <form onSubmit={handleStartInterview} className="space-y-6">
+          <div className="bg-blue-50 p-4 rounded-lg mb-4">
+            <p className="text-sm text-blue-800">
+              📌 This interview combines AI question generation with live video analysis. 
+              Upload your resume and job description to get started!
+            </p>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Upload Resume (PDF, DOCX, or TXT)
+            </label>
+            <input
+              type="file"
+              accept=".pdf,.docx,.doc,.txt"
+              onChange={(e) => setResume(e.target.files[0])}
+              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4
+                file:rounded-md file:border-0 file:text-sm file:font-semibold
+                file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              required
+            />
+            {resume && (
+              <p className="mt-2 text-sm text-green-600">✓ {resume.name}</p>
+            )}
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Job Description
+            </label>
+            <textarea
+              value={jobDescription}
+              onChange={(e) => setJobDescription(e.target.value)}
+              rows={6}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Paste the job description here..."
+              required
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Number of Questions
+            </label>
+            <select
+              value={numQuestions}
+              onChange={(e) => setNumQuestions(parseInt(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value={3}>3 Questions</option>
+              <option value={5}>5 Questions</option>
+              <option value={7}>7 Questions</option>
+            </select>
+          </div>
+          
+          <button
+            type="submit"
+            disabled={isGenerating}
+            className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 
+              transition-colors duration-200 font-semibold disabled:bg-gray-400"
+          >
+            {isGenerating ? 'Generating Questions...' : 'Start Live Interview'}
+          </button>
+        </form>
+      )}
+      
+      {/* Interview Step */}
+      {step === 'interview' && (
+        <div className="space-y-4">
+          {/* Question Display */}
+          <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 rounded-lg">
+            <p className="text-sm mb-1">
+              Question {currentQuestionIndex + 1} of {questions.length}
+            </p>
+            <p className="text-lg font-medium">
+              {questions[currentQuestionIndex]?.question}
+            </p>
+            <p className="text-sm mt-2 opacity-90">
+              Type: {questions[currentQuestionIndex]?.type}
+            </p>
+          </div>
+          
+          {/* Video Preview */}
+          <div className="relative bg-gray-900 rounded-lg overflow-hidden" style={{ height: '400px' }}>
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+            />
+            {!isRecording && answers.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75">
+                <div className="text-center">
+                  <p className="text-white text-lg mb-2">Ready to start your interview</p>
+                  <p className="text-gray-400 text-sm">Click "Start Interview" below</p>
+                </div>
+              </div>
+            )}
+            {isRecording && metrics?.no_face && (
+              <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-yellow-500 text-white px-4 py-2 rounded-md">
+                ⚠️ No face detected
+              </div>
+            )}
+          </div>
+
+          {/* Real-time Metrics */}
+          {metrics && !metrics.no_face && (
+            <div className="grid grid-cols-3 gap-4 p-4 bg-blue-50 rounded-lg">
               <div className="text-center">
-                <p className="text-white text-lg mb-2">Camera preview will appear here</p>
-                <p className="text-gray-400 text-sm">Click "Start Live Interview" to begin</p>
+                <p className="text-sm text-gray-600">Eye Contact</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {(metrics.eye_contact * 100).toFixed(0)}%
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-gray-600">Stability</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {(metrics.head_stability * 100).toFixed(0)}%
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-gray-600">Smile</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {(metrics.smile * 100).toFixed(0)}%
+                </p>
               </div>
             </div>
           )}
-          {isRecording && metrics?.no_face && (
-            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-yellow-500 text-white px-4 py-2 rounded-md">
-              ⚠️ No face detected
-            </div>
-          )}
-        </div>
 
-        {metrics && !metrics.no_face && (
-          <div className="grid grid-cols-3 gap-4 p-4 bg-blue-50 rounded-lg">
-            <div className="text-center">
-              <p className="text-sm text-gray-600">Eye Contact</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {(metrics.eye_contact * 100).toFixed(0)}%
-              </p>
-            </div>
-            <div className="text-center">
-              <p className="text-sm text-gray-600">Stability</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {(metrics.head_stability * 100).toFixed(0)}%
-              </p>
-            </div>
-            <div className="text-center">
-              <p className="text-sm text-gray-600">Smile</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {(metrics.smile * 100).toFixed(0)}%
-              </p>
-            </div>
-          </div>
-        )}
-
-        <div className="flex gap-4">
-          {!isRecording && !sessionId && (
-            <button
-              onClick={startRecording}
-              className="flex-1 bg-green-600 text-white py-3 px-4 rounded-md
-                hover:bg-green-700 transition-colors duration-200 font-semibold"
-            >
-              Start Live Interview
-            </button>
-          )}
-          
-          {isRecording && (
-            <button
-              onClick={stopRecording}
-              className="flex-1 bg-red-600 text-white py-3 px-4 rounded-md
-                hover:bg-red-700 transition-colors duration-200 font-semibold"
-            >
-              Stop Recording
-            </button>
-          )}
-          
-          {!isRecording && sessionId && (
-            <>
+          {/* Controls */}
+          <div className="flex gap-4">
+            {!isRecording && answers.length === 0 && (
               <button
-                onClick={saveInterview}
-                disabled={isSaving}
+                onClick={startInterview}
+                className="flex-1 bg-green-600 text-white py-3 px-4 rounded-md
+                  hover:bg-green-700 transition-colors duration-200 font-semibold"
+              >
+                🎤 Start Interview
+              </button>
+            )}
+            
+            {isRecording && !isSaving && (
+              <button
+                onClick={finishQuestion}
+                disabled={duration < 5}
                 className="flex-1 bg-blue-600 text-white py-3 px-4 rounded-md
                   hover:bg-blue-700 transition-colors duration-200 font-semibold
                   disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
-                {isSaving ? 'Saving...' : 'Save & View Results'}
+                {duration < 5 ? `Answer for at least 5 seconds (${5 - duration}s)` : '✓ Next Question'}
               </button>
-              <button
-                onClick={() => {
-                  setSessionId(null)
-                  setDuration(0)
-                  setMetrics(null)
-                  audioChunksRef.current = []
-                }}
-                disabled={isSaving}
-                className="px-6 bg-gray-300 text-gray-700 py-3 rounded-md
-                  hover:bg-gray-400 transition-colors duration-200 font-semibold
-                  disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Discard
-              </button>
-            </>
-          )}
-        </div>
+            )}
+            
+            {isSaving && (
+              <div className="flex-1 bg-gray-400 text-white py-3 px-4 rounded-md text-center font-semibold">
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Analyzing answer...
+                </div>
+              </div>
+            )}
+          </div>
 
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <p className="text-sm text-gray-700 font-semibold mb-2">📌 Tips for best results:</p>
-          <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
-            <li>Ensure good lighting on your face</li>
-            <li>Look directly at the camera for eye contact</li>
-            <li>Keep your head stable and centered</li>
-            <li>Speak clearly into the microphone</li>
-            <li>Record for at least 30 seconds for accurate analysis</li>
-          </ul>
+          {/* Progress */}
+          {answers.length > 0 && (
+            <div className="bg-green-50 p-4 rounded-lg">
+              <p className="text-sm font-medium text-green-800">
+                ✓ {answers.length} of {questions.length} questions answered
+              </p>
+            </div>
+          )}
+
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <p className="text-sm text-gray-700 font-semibold mb-2">📌 Tips:</p>
+            <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+              <li>Look at the camera for eye contact</li>
+              <li>Speak clearly and avoid filler words</li>
+              <li>Answer for 30-60 seconds per question</li>
+            </ul>
+          </div>
         </div>
-      </div>
+      )}
+      
+      {/* Results Step */}
+      {step === 'results' && overallResults && (
+        <div className="space-y-6">
+          <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-6 rounded-lg">
+            <h3 className="text-2xl font-bold mb-2">🎉 Interview Complete!</h3>
+            <div className="grid grid-cols-3 gap-4 mt-4">
+              <div className="text-center">
+                <p className="text-3xl font-bold">{overallResults.overall_score}</p>
+                <p className="text-sm opacity-90">Overall Score</p>
+              </div>
+              <div className="text-center">
+                <p className="text-3xl font-bold">{overallResults.technical_score}</p>
+                <p className="text-sm opacity-90">Technical</p>
+              </div>
+              <div className="text-center">
+                <p className="text-3xl font-bold">{overallResults.behavioral_score}</p>
+                <p className="text-sm opacity-90">Behavioral</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            <h4 className="text-lg font-semibold">Detailed Feedback</h4>
+            {answers.map((answer, index) => (
+              <div key={index} className="border border-gray-200 rounded-lg p-4">
+                <p className="font-medium text-gray-900 mb-2">Q{index + 1}: {answer.question}</p>
+                <p className="text-sm text-gray-600 mb-2">Your answer: {answer.answer.substring(0, 150)}...</p>
+                <div className="flex items-center gap-4 mt-3">
+                  <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                    answer.score >= 80 ? 'bg-green-100 text-green-800' :
+                    answer.score >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    Score: {answer.score}/100
+                  </span>
+                  <p className="text-sm text-gray-600">{answer.feedback}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <div className="flex gap-4">
+            <button
+              onClick={() => {
+                setStep('setup')
+                setAiSessionId(null)
+                setQuestions([])
+                setCurrentQuestionIndex(0)
+                setAnswers([])
+                setOverallResults(null)
+                setResume(null)
+                setJobDescription('')
+              }}
+              className="flex-1 bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 
+                transition-colors duration-200 font-semibold"
+            >
+              Start New Interview
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              className="flex-1 bg-gray-300 text-gray-700 py-3 px-4 rounded-md hover:bg-gray-400 
+                transition-colors duration-200 font-semibold"
+            >
+              Back to Home
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
