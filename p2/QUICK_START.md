@@ -1,193 +1,170 @@
-# 🚀 Quick Start Guide - InterviewAI Frontend
+# 🚀 Quick Start Guide
 
-## Prerequisites
-
-- Node.js 16+ installed
-- npm or yarn package manager
-- Modern web browser (Chrome, Firefox, Safari, Edge)
-
-## Installation (Choose One Method)
-
-### Method 1: Automated Setup (Recommended)
-
-**Windows:**
-```bash
-cd p2
-setup_frontend.bat
-```
-
-**Mac/Linux:**
-```bash
-cd p2
-chmod +x setup_frontend.sh
-./setup_frontend.sh
-```
-
-### Method 2: Manual Setup
-
-```bash
-# Navigate to frontend directory
-cd p2/frontend
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-```
-
-## Access the Application
-
-Once the server starts, open your browser to:
-```
-http://localhost:5173
-```
-
-## What You'll See
-
-### 1. Landing Page (/)
-- Modern hero section with animated preview
-- Feature showcase
-- How it works section
-- Testimonials
-- Professional footer
-
-### 2. Live Interview (/live-interview)
-- Real-time interview simulation
-- AI interviewer with questions
-- Webcam preview
-- Live performance metrics
-
-### 3. Upload Page (/upload)
-- Drag & drop file upload
-- Multi-file support
-- Progress tracking
-
-### 4. Dashboard (/dashboard)
-- Performance analytics
-- Charts and visualizations
-- Strengths and improvements
-- Practice suggestions
-
-## Project Structure
-
-```
-p2/frontend/
-├── src/
-│   ├── components/     # Reusable UI components
-│   ├── pages/         # Page components
-│   ├── api/           # API client
-│   └── App.jsx        # Main app
-├── package.json       # Dependencies
-└── tailwind.config.js # Styling config
-```
-
-## Available Scripts
-
-```bash
-# Development server (with hot reload)
-npm run dev
-
-# Production build
-npm run build
-
-# Preview production build
-npm run preview
-```
-
-## Key Features
-
-✅ Modern, minimal design
-✅ Dark mode optimized
-✅ Fully responsive
-✅ Smooth animations
-✅ Glassmorphism UI
-✅ Real-time metrics
-✅ File upload support
-✅ Analytics dashboard
-
-## Tech Stack
-
-- React 18.2.0
-- Tailwind CSS 3.4.1
-- Framer Motion 10.18.0
-- Lucide React (icons)
-- Recharts (charts)
-- React Router DOM
-
-## Customization
-
-### Colors
-Edit `tailwind.config.js` to customize the color scheme.
-
-### Components
-All components are in `src/components/` and can be easily modified.
-
-### Pages
-Page layouts are in `src/pages/` and use the component library.
-
-## Troubleshooting
-
-### Port Already in Use
-```bash
-# Kill process on port 5173
-npx kill-port 5173
-npm run dev
-```
-
-### Dependencies Issues
-```bash
-# Clear and reinstall
-rm -rf node_modules package-lock.json
-npm install
-```
-
-### Build Errors
-```bash
-# Check for errors
-npm run build
-```
-
-## Next Steps
-
-1. ✅ Frontend is running
-2. 🔄 Connect to backend API
-3. 🎥 Implement WebRTC for live video
-4. 🔐 Add authentication
-5. 🤖 Integrate real AI analysis
-
-## Documentation
-
-- **FRONTEND_README.md** - Comprehensive documentation
-- **COMPONENT_GUIDE.md** - Component usage guide
-- **DESIGN_TOKENS.md** - Design system reference
-- **MODERN_FRONTEND_SUMMARY.md** - Implementation overview
-
-## Support
-
-For issues or questions:
-1. Check the documentation files
-2. Review component code
-3. Check browser console for errors
-
-## Development Tips
-
-- Use browser DevTools for debugging
-- Check Network tab for API calls
-- Use React DevTools extension
-- Hot reload works automatically
-- Changes save automatically
+Get the AI Interview Analyzer running in 5 minutes!
 
 ---
 
-**You're all set!** 🎉
+## ⚡ Super Quick Start (Automated)
 
-The frontend is now running. Navigate through the pages to see the modern, premium interface in action.
+### Windows Users:
+1. Double-click `INSTALL_AI_FEATURE.bat` (installs everything)
+2. Double-click `run.bat` (starts the app)
+3. Open browser to http://localhost:5173
 
-**Main Routes:**
-- `/` - Landing page
-- `/live-interview` - Live interview
-- `/upload` - Upload recording
-- `/dashboard` - Analytics dashboard
+### Mac/Linux Users:
+```bash
+chmod +x install_ai_feature.sh run.sh
+./install_ai_feature.sh
+./run.sh
+```
+Then open browser to http://localhost:5173
 
-Enjoy building with InterviewAI! 🚀
+---
+
+## 📋 Prerequisites Checklist
+
+Before starting, install these (one-time setup):
+
+- [ ] **Python 3.8+** → https://www.python.org/downloads/
+- [ ] **Node.js 16+** → https://nodejs.org/
+- [ ] **FFmpeg** → https://ffmpeg.org/download.html
+
+**Verify installations:**
+```bash
+python --version    # Should show 3.8 or higher
+node --version      # Should show 16 or higher
+ffmpeg -version     # Should show FFmpeg info
+```
+
+---
+
+## 🛠️ Manual Installation (5 Steps)
+
+### Step 1: Install Backend Dependencies
+```bash
+cd backend
+python -m venv venv
+
+# Activate virtual environment:
+venv\Scripts\activate          # Windows
+source venv/bin/activate       # Mac/Linux
+
+pip install -r ../requirements-all.txt
+```
+
+### Step 2: Install Frontend Dependencies
+```bash
+cd frontend
+npm install
+```
+
+### Step 3: Create Required Folders
+```bash
+cd backend
+mkdir uploads temp    # Windows
+mkdir -p uploads temp # Mac/Linux
+```
+
+### Step 4: Start Backend (Terminal 1)
+```bash
+cd backend
+venv\Scripts\activate          # Windows
+source venv/bin/activate       # Mac/Linux
+
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### Step 5: Start Frontend (Terminal 2)
+```bash
+cd frontend
+npm run dev
+```
+
+### Step 6: Open Browser
+Go to: **http://localhost:5173**
+
+---
+
+## ✅ Verify It's Working
+
+1. **Backend Check**: Open http://localhost:8000/docs
+   - You should see API documentation
+
+2. **Frontend Check**: Open http://localhost:5173
+   - You should see the homepage
+
+3. **Feature Check**: Click "Interviews" in navbar
+   - You should see Upload, AI Interview, and Live Interview tabs
+
+---
+
+## 🎯 What Can You Do?
+
+### 1. Upload & Analyze Videos
+- Click "Interviews" → "Upload" tab
+- Upload a video file
+- Get detailed analysis and feedback
+
+### 2. Live Interview Practice
+- Click "Interviews" → "Live Interview" tab
+- Allow camera access
+- Practice with real-time feedback
+
+### 3. AI-Powered Interview
+- Click "Interviews" → "AI Interview" tab
+- Upload resume and job description
+- Get personalized interview questions
+
+---
+
+## 🐛 Quick Troubleshooting
+
+### "Python not found"
+- Reinstall Python with "Add to PATH" checked
+- Or use `python3` instead of `python`
+
+### "FFmpeg not found"
+- Install FFmpeg and restart terminal
+- Windows: Add FFmpeg to system PATH
+
+### "Port already in use"
+- Kill the process or use different port:
+  ```bash
+  uvicorn main:app --reload --port 8001
+  ```
+
+### "Module not found"
+- Reinstall dependencies:
+  ```bash
+  pip install -r ../requirements-all.txt
+  npm install
+  ```
+
+### "Camera not working"
+- Allow camera permissions in browser
+- Use Chrome or Edge browser
+- Check if another app is using camera
+
+---
+
+## 📚 Need More Help?
+
+- **Detailed Installation**: See `INSTALLATION_GUIDE.md`
+- **Full Documentation**: See `README.md`
+- **API Docs**: http://localhost:8000/docs
+- **Troubleshooting**: See `TROUBLESHOOTING_INSTALL.md`
+
+---
+
+## 🎉 You're All Set!
+
+The application is now running:
+- **Frontend**: http://localhost:5173
+- **Backend**: http://localhost:8000
+- **API Docs**: http://localhost:8000/docs
+
+Start by clicking "Interviews" in the navigation bar and explore the features!
+
+---
+
+**Pro Tip**: Keep both terminal windows open while using the app. Press `CTRL+C` in each terminal to stop the servers when done.

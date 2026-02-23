@@ -34,20 +34,20 @@ const Navbar = () => {
               Home
             </Link>
             <Link
+              to="/home"
+              className={`text-sm font-medium transition-colors ${
+                isActive('/home') ? 'text-white' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Interviews
+            </Link>
+            <Link
               to="/live-interview"
               className={`text-sm font-medium transition-colors ${
                 isActive('/live-interview') ? 'text-white' : 'text-gray-400 hover:text-white'
               }`}
             >
               Live Interview
-            </Link>
-            <Link
-              to="/upload"
-              className={`text-sm font-medium transition-colors ${
-                isActive('/upload') ? 'text-white' : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              Upload
             </Link>
             <Link
               to="/dashboard"
@@ -61,7 +61,7 @@ const Navbar = () => {
 
           {/* CTA Button */}
           <div className="hidden md:block">
-            <Link to="/live-interview">
+            <Link to="/home">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -98,18 +98,18 @@ const Navbar = () => {
               Home
             </Link>
             <Link
+              to="/home"
+              className="block text-sm font-medium text-gray-400 hover:text-white"
+              onClick={() => setIsOpen(false)}
+            >
+              Interviews
+            </Link>
+            <Link
               to="/live-interview"
               className="block text-sm font-medium text-gray-400 hover:text-white"
               onClick={() => setIsOpen(false)}
             >
               Live Interview
-            </Link>
-            <Link
-              to="/upload"
-              className="block text-sm font-medium text-gray-400 hover:text-white"
-              onClick={() => setIsOpen(false)}
-            >
-              Upload
             </Link>
             <Link
               to="/dashboard"
@@ -118,7 +118,7 @@ const Navbar = () => {
             >
               Dashboard
             </Link>
-            <Link to="/live-interview" onClick={() => setIsOpen(false)}>
+            <Link to="/home" onClick={() => setIsOpen(false)}>
               <button className="w-full px-6 py-2 bg-gradient-accent text-white rounded-lg font-medium text-sm">
                 Start Interview
               </button>

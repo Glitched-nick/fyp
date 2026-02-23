@@ -42,12 +42,11 @@ function UploadForm() {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-semibold mb-4">Upload Interview Video</h2>
+    <div className="glass rounded-2xl p-8 border border-surface-border">
       
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-300 mb-2">
             Select Video File
           </label>
           <input
@@ -55,36 +54,37 @@ function UploadForm() {
             accept="video/*"
             onChange={handleFileChange}
             disabled={uploading}
-            className="block w-full text-sm text-gray-500
+            className="block w-full text-sm text-gray-300
               file:mr-4 file:py-2 file:px-4
               file:rounded-md file:border-0
               file:text-sm file:font-semibold
-              file:bg-blue-50 file:text-blue-700
-              hover:file:bg-blue-100
-              disabled:opacity-50"
+              file:bg-blue-500/20 file:text-blue-400
+              hover:file:bg-blue-500/30
+              disabled:opacity-50
+              bg-surface-elevated border border-surface-border rounded-md p-2"
           />
           {file && (
-            <p className="mt-2 text-sm text-gray-600">
+            <p className="mt-2 text-sm text-gray-400">
               Selected: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
             </p>
           )}
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-xl">
             {error}
           </div>
         )}
 
         {uploading && (
           <div>
-            <div className="w-full bg-gray-200 rounded-full h-2.5">
+            <div className="w-full bg-surface-elevated rounded-full h-2.5 border border-surface-border">
               <div
-                className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                className="bg-gradient-accent h-2.5 rounded-full transition-all duration-300"
                 style={{ width: `${progress}%` }}
               ></div>
             </div>
-            <p className="text-sm text-gray-600 mt-2 text-center">
+            <p className="text-sm text-gray-400 mt-2 text-center">
               {progress < 100 ? `Uploading... ${progress}%` : 'Processing video...'}
             </p>
           </div>
@@ -93,9 +93,9 @@ function UploadForm() {
         <button
           type="submit"
           disabled={!file || uploading}
-          className="w-full bg-blue-600 text-white py-2 px-4 rounded-md
-            hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed
-            transition-colors duration-200"
+          className="w-full bg-gradient-accent text-white py-3 px-4 rounded-xl
+            hover:shadow-xl disabled:bg-gray-600 disabled:cursor-not-allowed
+            transition-all duration-200 font-semibold professional-glow"
         >
           {uploading ? 'Processing...' : 'Analyze Interview'}
         </button>

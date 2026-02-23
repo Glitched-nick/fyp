@@ -2,7 +2,35 @@
 
 A full-stack application that analyzes interview videos using local AI models. Get detailed feedback on facial expressions, body language, and speech patterns without requiring external APIs or paid services.
 
+---
+
+## 📚 Documentation Quick Links
+
+**New to the project? Start here:**
+
+| Guide | Description | Best For |
+|-------|-------------|----------|
+| [🚀 Quick Start](QUICK_START.md) | Get running in 5 minutes | Beginners |
+| [📖 Installation Guide](INSTALLATION_GUIDE.md) | Complete setup with troubleshooting | First-time setup |
+| [📦 Single Requirements File](COMPLETE_INSTALLATION.md) | Install from one file: `requirements-all.txt` | Simplified setup |
+| [📋 Setup Summary](SETUP_SUMMARY.md) | Quick reference for all setup info | Quick lookup |
+| [📦 Dependencies](DEPENDENCIES.md) | All packages and versions | Understanding requirements |
+| [🐛 Troubleshooting](TROUBLESHOOTING_INSTALL.md) | Common issues and solutions | Problem solving |
+| [📄 Cheat Sheet](INSTALL_CHEATSHEET.md) | One-page command reference | Quick commands |
+
+**📚 [View All Documentation](DOCUMENTATION_INDEX.md)** - Complete documentation index
+
+**⚡ Single Requirements File:** All dependencies are now in [`requirements-all.txt`](requirements-all.txt) - see [COMPLETE_INSTALLATION.md](COMPLETE_INSTALLATION.md) for usage.
+
+---
+
 ## 🚀 Quick Start
+
+### 📖 New to the Project?
+
+**Start here for step-by-step instructions:**
+- **Complete Guide**: See [`INSTALLATION_GUIDE.md`](INSTALLATION_GUIDE.md) - Detailed installation with troubleshooting
+- **Quick Setup**: See [`QUICK_START.md`](QUICK_START.md) - Get running in 5 minutes
 
 ### Option 1: Automated Setup (Recommended)
 
@@ -22,7 +50,7 @@ chmod +x install_ai_feature.sh run.sh
 
 ### Option 2: Manual Setup
 
-Follow the detailed instructions below.
+Follow the instructions in [`INSTALLATION_GUIDE.md`](INSTALLATION_GUIDE.md) for detailed steps.
 
 ---
 
