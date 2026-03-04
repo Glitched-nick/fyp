@@ -94,3 +94,33 @@ class AIInterviewAnswer(Base):
     
     # Relationship
     session = relationship("AIInterviewSession", back_populates="answers")
+
+
+class User(Base):
+    """
+    User table for authentication
+    """
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    username = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    full_name = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Resume information
+    resume_filename = Column(String, nullable=True)
+    resume_text = Column(Text, nullable=True)
+    resume_uploaded_at = Column(DateTime, nullable=True)
+
+    # Profile
+    phone = Column(String, nullable=True)
+    location = Column(String, nullable=True)
+    is_active = Column(Integer, default=1)
+
+    # OAuth fields
+    google_id = Column(String, unique=True, nullable=True, index=True)
+    oauth_provider = Column(String, nullable=True)  # 'google', 'github', etc.
+    profile_picture = Column(String, nullable=True)
+

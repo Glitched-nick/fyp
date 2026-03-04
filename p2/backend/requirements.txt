@@ -1,54 +1,42 @@
-# ============================================
-# AI Interview Analyzer - Backend Dependencies
-# ============================================
-# 
-# Installation: pip install -r requirements.txt
-# Python Version: 3.8 or higher required
-# 
-# Note: First run will download Whisper AI model (~140MB)
-# FFmpeg must be installed separately on your system
-# ============================================
+# Utilities (must be first)
+setuptools>=65.0.0
+wheel>=0.40.0
 
-# Core API Framework
-fastapi==0.109.0              # Modern web framework for building APIs
-uvicorn[standard]==0.27.0     # ASGI server with WebSocket support
-python-multipart==0.0.6       # File upload support
-sqlalchemy==2.0.25            # SQL toolkit and ORM
-pydantic>=2.0.0               # Data validation using Python type hints
+# Web Framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+websockets==12.0
 
-# WebSocket Support
-websockets>=11.0              # WebSocket protocol implementation
+# Database
+sqlalchemy==2.0.25
 
-# Computer Vision & Video Processing
-opencv-python-headless==4.9.0.80  # Computer vision library (no GUI)
-mediapipe==0.10.9             # Google's ML solutions for face detection
+# Video Processing
+opencv-python==4.9.0.80
+mediapipe==0.10.32
+deepface==0.0.99
+tf-keras==2.20.1
 
-# Audio Processing & Speech Recognition
-openai-whisper                # OpenAI's speech-to-text model
-librosa==0.10.1               # Audio analysis library
-soundfile>=0.12.1             # Audio file I/O
-audioread>=3.0.0              # Audio file reading
-ffmpeg-python>=0.2.0          # FFmpeg wrapper for Python
+# Scientific Computing (needed before audio processing)
+numpy==1.26.3
+scipy==1.12.0
 
-# Scientific Computing
-numpy>=1.24.0,<2.0.0          # Numerical computing library
-scipy>=1.10.0,<2.0.0          # Scientific computing library
+# Audio Processing
+openai-whisper
+librosa==0.10.1
+soundfile==0.12.1
 
 # Document Processing
-PyPDF2==3.0.1                 # PDF file processing
-python-docx==1.1.0            # Microsoft Word document processing
+PyPDF2==3.0.1
+python-docx==1.1.0
+python-magic==0.4.27
 
-# Utilities
-setuptools>=65.0.0            # Package development and distribution
-python-dotenv>=1.0.0          # Environment variable management
+# Environment
+python-dotenv==1.0.0
 
-# AI/LLM Integration (Optional - for enhanced AI Interview feature)
-google-generativeai>=0.8.0    # Google Gemini API client
-
-# ============================================
-# System Requirements:
-# - Python 3.8+
-# - FFmpeg (must be installed separately)
-# - 4GB RAM minimum (8GB recommended)
-# - 2GB free disk space
-# ============================================
+# Authentication
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+google-auth==2.26.2
+google-auth-oauthlib==1.2.0
+google-auth-httplib2==0.2.0

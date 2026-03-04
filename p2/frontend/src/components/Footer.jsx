@@ -13,7 +13,7 @@ const Footer = () => {
               <div className="w-8 h-8 bg-gradient-accent rounded-lg flex items-center justify-center">
                 <Sparkles className="w-5 h-5 text-white" />
               </div>
-              <span className="text-xl font-bold">InterviewAI</span>
+              <span className="text-xl font-bold">Intrex</span>
             </div>
             <p className="text-gray-400 text-sm mb-4">
               Master your interviews with AI-powered practice and feedback.
@@ -113,7 +113,7 @@ const Footer = () => {
 
         {/* Bottom */}
         <div className="pt-8 border-t border-surface-border text-center text-sm text-gray-400">
-          <p>&copy; {new Date().getFullYear()} InterviewAI. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Intrex. All rights reserved.</p>
         </div>
       </div>
     </footer>

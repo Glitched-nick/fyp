@@ -19,6 +19,12 @@ function LiveInterview() {
   const [duration, setDuration] = useState(0)
   const [isSaving, setIsSaving] = useState(false)
   const [wsConnected, setWsConnected] = useState(false)
+  const [faceDetectionCount, setFaceDetectionCount] = useState(0)
+  const [totalFramesProcessed, setTotalFramesProcessed] = useState(0)
+  const [currentEmotion, setCurrentEmotion] = useState(null)
+  const [emotionConfidence, setEmotionConfidence] = useState(0)
+  
+  // Results state
   const [overallResults, setOverallResults] = useState(null)
   
   const videoRef = useRef(null)
@@ -34,21 +40,46 @@ function LiveInterview() {
 
   const handleStartInterview = async (e) => {
     e.preventDefault()
-    if (!resume || !jobDescription.trim()) {
-      alert('Please upload a resume and provide a job description')
+    
+    if (!resume) {
+      alert('Please upload your resume first')
+      return
+    }
+    
+    if (!jobDescription.trim()) {
+      alert('Please provide the job description for the company you want to interview with')
       return
     }
     setIsGenerating(true)
     try {
-      const response = await startAIInterview(resume, jobDescription, numQuestions)
-      if (response.success) {
-        setAiSessionId(response.session_id)
-        setQuestions(response.questions)
+      const formData = new FormData()
+      formData.append('resume', resume)
+      formData.append('job_description', jobDescription)
+      formData.append('num_questions', numQuestions)
+      
+      console.log('Starting AI interview with:', {
+        resume: resume.name,
+        jobDescLength: jobDescription.length,
+        numQuestions
+      })
+      
+      const response = await api.post('/ai-interview/start', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      
+      console.log('Interview started:', response.data)
+      
+      if (response.data.success) {
+        setAiSessionId(response.data.session_id)
+        setQuestions(response.data.questions)
         setStep('interview')
+        // Auto-start the interview after questions are generated
+        setTimeout(() => startInterview(), 500)
       }
     } catch (error) {
       console.error('Error starting interview:', error)
-      alert(error.response?.data?.detail || 'Failed to start interview')
+      const errorMsg = error.response?.data?.detail || error.message || 'Failed to start interview'
+      alert(`Error: ${errorMsg}`)
     } finally {
       setIsGenerating(false)
     }
@@ -56,15 +87,35 @@ function LiveInterview() {
 
   const startInterview = async () => {
     try {
+      // Try to get camera and microphone with higher quality settings
       let stream = null
       try {
         stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { width: { ideal: 1280 }, height: { ideal: 720 } }, 
-          audio: { echoCancellation: true, noiseSuppression: true }
+          video: { 
+            width: { ideal: 1920, min: 1280 }, 
+            height: { ideal: 1080, min: 720 },
+            facingMode: 'user',
+            frameRate: { ideal: 30 }
+          }, 
+          audio: { 
+            echoCancellation: true, 
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 48000
+          }
         })
         streamRef.current = stream
-        if (videoRef.current) videoRef.current.srcObject = stream
-        const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          // Mirror the video for natural self-view
+          videoRef.current.style.transform = 'scaleX(-1)'
+        }
+
+        // Generate session ID for facial analysis
+        const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        setSessionId(newSessionId)
+
+        // Setup WebSocket for facial analysis
         try {
           wsRef.current = new WebSocket('ws://localhost:8000/api/live')
           wsRef.current.onopen = () => {
@@ -73,22 +124,55 @@ function LiveInterview() {
           }
           wsRef.current.onmessage = (event) => {
             const data = JSON.parse(event.data)
-            if (data.type === 'metrics') setMetrics(data.data)
+            if (data.type === 'metrics') {
+              setMetrics(data.data)
+              setTotalFramesProcessed(prev => prev + 1)
+              if (!data.data.no_face) {
+                setFaceDetectionCount(prev => prev + 1)
+              }
+              
+              // Debug: Log all received data
+              console.log('📊 Metrics received:', {
+                eye_contact: data.data.eye_contact,
+                engagement: data.data.engagement,
+                has_emotion: !!data.data.emotion,
+                emotion: data.data.emotion,
+                emotion_confidence: data.data.emotion_confidence
+              })
+              
+              // Update emotion state if available
+              if (data.data.emotion) {
+                console.log('🎭 Emotion received:', data.data.emotion, 'Confidence:', data.data.emotion_confidence)
+                setCurrentEmotion(data.data.emotion)
+                setEmotionConfidence(data.data.emotion_confidence || 0)
+              } else {
+                console.log('⚠️ No emotion in this frame')
+              }
+            }
+          }
+          wsRef.current.onerror = () => {
+            console.log('WebSocket error - continuing without facial analysis')
           }
           wsRef.current.onerror = () => console.log('WebSocket error')
         } catch (wsError) {
           console.log('Could not connect WebSocket')
         }
+
+        // Send video frames if WebSocket connected (higher frequency for better accuracy)
         const canvas = document.createElement('canvas')
         const ctx = canvas.getContext('2d')
         frameIntervalRef.current = setInterval(() => {
           if (videoRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
             canvas.width = videoRef.current.videoWidth
             canvas.height = videoRef.current.videoHeight
-            ctx.drawImage(videoRef.current, 0, 0)
-            wsRef.current.send(JSON.stringify({ frame: canvas.toDataURL('image/jpeg', 0.8) }))
+            // Flip the canvas horizontally to match the mirrored video
+            ctx.save()
+            ctx.scale(-1, 1)
+            ctx.drawImage(videoRef.current, -canvas.width, 0, canvas.width, canvas.height)
+            ctx.restore()
+            wsRef.current.send(JSON.stringify({ frame: canvas.toDataURL('image/jpeg', 0.85) }))
           }
-        }, 200)
+        }, 150)  // Send frames every 150ms for better accuracy
       } catch (mediaError) {
         console.error('Media access error:', mediaError)
         const proceed = confirm('Could not access camera/microphone. Continue without video?')
@@ -125,6 +209,26 @@ function LiveInterview() {
   }
 
   const finishQuestion = async () => {
+    // Check face detection rate
+    const facePresenceRate = totalFramesProcessed > 0 ? faceDetectionCount / totalFramesProcessed : 0
+    
+    if (facePresenceRate < 0.5) {
+      const proceed = confirm(
+        `⚠️ WARNING: Your face was only detected in ${(facePresenceRate * 100).toFixed(0)}% of frames.\n\n` +
+        `This will result in a score of 0 for this question.\n\n` +
+        `Recommendations:\n` +
+        `• Ensure your camera is not blocked\n` +
+        `• Improve lighting on your face\n` +
+        `• Position yourself clearly in frame\n` +
+        `• Check camera permissions\n\n` +
+        `Do you want to continue anyway?`
+      )
+      
+      if (!proceed) {
+        return
+      }
+    }
+    
     if (duration < 5) {
       alert('Please answer for at least 5 seconds')
       return
@@ -154,6 +258,9 @@ function LiveInterview() {
       }
       if (currentQuestionIndex < questions.length - 1) {
         setCurrentQuestionIndex(currentQuestionIndex + 1)
+        // Reset face detection counters for next question
+        setFaceDetectionCount(0)
+        setTotalFramesProcessed(0)
         setTimeout(() => startQuestionRecording(), 1000)
       } else {
         finishInterview()
@@ -207,16 +314,52 @@ function LiveInterview() {
   return (
     <AnimatePresence mode="wait">
       {step === 'setup' && (
-        <motion.div
-          key="setup"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          className="glass rounded-2xl p-8 border border-white/10"
-        >
-          <div className="mb-8">
-            <h2 className="text-3xl font-bold mb-2">Live AI Interview</h2>
-            <p className="text-gray-400">Practice with real-time video analysis and AI-generated questions</p>
+        <form onSubmit={handleStartInterview} className="space-y-6">
+          <div className="bg-blue-50 p-4 rounded-lg mb-4">
+            <p className="text-sm text-blue-800 font-semibold mb-2">
+              📌 How it works:
+            </p>
+            <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+              <li>Upload your resume (PDF, DOCX, or TXT)</li>
+              <li>Enter the job description for the company you're targeting</li>
+              <li>Our AI will scan your resume and generate personalized interview questions</li>
+              <li>Answer questions via video while we analyze your performance</li>
+            </ol>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Upload Resume (PDF, DOCX, or TXT)
+            </label>
+            <input
+              type="file"
+              accept=".pdf,.docx,.doc,.txt"
+              onChange={(e) => setResume(e.target.files[0])}
+              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4
+                file:rounded-md file:border-0 file:text-sm file:font-semibold
+                file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              required
+            />
+            {resume && (
+              <p className="mt-2 text-sm text-green-600">✓ {resume.name}</p>
+            )}
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Job Description / Company & Role
+            </label>
+            <textarea
+              value={jobDescription}
+              onChange={(e) => setJobDescription(e.target.value)}
+              rows={6}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Paste the job description here, or describe the company and role you're interviewing for (e.g., 'Software Engineer at Google - Full stack development with React and Python')..."
+              required
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              The AI will analyze your resume against this job description to generate relevant questions
+            </p>
           </div>
 
           <form onSubmit={handleStartInterview} className="space-y-6">
@@ -301,79 +444,327 @@ function LiveInterview() {
                 text-lg flex items-center justify-center space-x-2 professional-glow
                 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              {isGenerating ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Generating Questions...</span>
-                </>
-              ) : (
-                <>
-                  <Play className="w-5 h-5" />
-                  <span>Start Live Interview</span>
-                </>
-              )}
-            </motion.button>
-          </form>
-        </motion.div>
+              <option value={3}>3 Questions</option>
+              <option value={5}>5 Questions</option>
+              <option value={7}>7 Questions</option>
+            </select>
+          </div>
+          
+          <button
+            type="submit"
+            disabled={isGenerating || !resume || !jobDescription.trim()}
+            className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 
+              transition-colors duration-200 font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            {isGenerating ? (
+              <span className="flex items-center justify-center gap-2">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Analyzing Resume & Generating Questions...
+              </span>
+            ) : (
+              '🚀 Generate Questions & Start Interview'
+            )}
+          </button>
+          {(!resume || !jobDescription.trim()) && (
+            <p className="text-sm text-gray-500 text-center mt-2">
+              Please upload your resume and enter job description to continue
+            </p>
+          )}
+        </form>
       )}
 
       {step === 'interview' && (
-        <motion.div
-          key="interview"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="grid lg:grid-cols-2 gap-6"
-        >
-          {/* Left Panel - AI Interviewer */}
-          <div className="glass rounded-2xl p-8 border border-white/10">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-gradient-accent rounded-full flex items-center justify-center">
-                  <div className="w-3 h-3 bg-white rounded-full animate-pulse" />
+        <div className="space-y-4">
+          {/* Interview Context Summary */}
+          <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200">
+            <p className="text-sm font-semibold text-gray-800 mb-2">📋 Interview Context:</p>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <span className="text-gray-600">Resume:</span>
+                <span className="ml-2 font-medium text-gray-900">{resume?.name}</span>
+              </div>
+              <div>
+                <span className="text-gray-600">Questions:</span>
+                <span className="ml-2 font-medium text-gray-900">{questions.length} personalized questions</span>
+              </div>
+            </div>
+            <div className="mt-2">
+              <span className="text-gray-600 text-sm">Target Role:</span>
+              <p className="text-gray-900 font-medium text-sm mt-1 line-clamp-2">{jobDescription.substring(0, 150)}...</p>
+            </div>
+          </div>
+          
+          {/* Question Display */}
+          <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 rounded-lg">
+            <p className="text-sm mb-1 opacity-90">
+              Question {currentQuestionIndex + 1} of {questions.length} • Based on your resume
+            </p>
+            <p className="text-lg font-medium">
+              {questions[currentQuestionIndex]?.question}
+            </p>
+            <div className="flex items-center gap-3 mt-2">
+              <span className="text-xs px-2 py-1 bg-white bg-opacity-20 rounded">
+                Type: {questions[currentQuestionIndex]?.type}
+              </span>
+              {questions[currentQuestionIndex]?.topic && (
+                <span className="text-xs px-2 py-1 bg-white bg-opacity-20 rounded">
+                  Topic: {questions[currentQuestionIndex]?.topic}
+                </span>
+              )}
+            </div>
+          </div>
+          
+          {/* Video Preview */}
+          <div className="relative bg-gray-900 rounded-lg overflow-hidden shadow-2xl" style={{ height: '480px' }}>
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+              style={{ filter: 'brightness(1.05) contrast(1.05)' }}
+            />
+            {!isRecording && answers.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75">
+                <div className="text-center">
+                  <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-blue-600 flex items-center justify-center">
+                    <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <p className="text-white text-lg mb-2">Ready to start your interview</p>
+                  <p className="text-gray-400 text-sm">Click "Start Interview" below</p>
                 </div>
-                <div>
-                  <div className="font-semibold text-white">AI Interviewer</div>
-                  <div className="text-sm text-gray-400">
-                    {isRecording ? 'Listening...' : 'Ready to begin'}
+              </div>
+            )}
+            {isRecording && metrics?.no_face && (
+              <div className="absolute inset-0 flex items-center justify-center bg-red-900 bg-opacity-90">
+                <div className="text-center p-8">
+                  <svg className="w-20 h-20 text-white mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <p className="text-white text-2xl font-bold mb-2">⚠️ Camera Blocked or No Face Detected</p>
+                  <p className="text-white text-lg mb-4">Your interview cannot be scored without visible face detection</p>
+                  <div className="bg-white bg-opacity-20 rounded-lg p-4 text-left">
+                    <p className="text-white font-semibold mb-2">Please ensure:</p>
+                    <ul className="text-white space-y-1">
+                      <li>• Camera is not blocked or covered</li>
+                      <li>• Your face is clearly visible</li>
+                      <li>• Adequate lighting on your face</li>
+                      <li>• You are centered in the frame</li>
+                      <li>• Camera permissions are granted</li>
+                    </ul>
+                  </div>
+                  <p className="text-yellow-300 text-sm mt-4 font-semibold">
+                    ⚠️ Scores will be 0 if face is not detected during recording
+                  </p>
+                </div>
+              </div>
+            )}
+            {isRecording && metrics && !metrics.no_face && (
+              <div className="absolute top-4 right-4 flex flex-col gap-2">
+                {metrics.eye_contact < 0.5 && (
+                  <div className="bg-blue-600 bg-opacity-90 text-white px-3 py-1 rounded-md text-sm">
+                    💡 Look at the camera
+                  </div>
+                )}
+                {metrics.centering && metrics.centering < 0.6 && (
+                  <div className="bg-purple-600 bg-opacity-90 text-white px-3 py-1 rounded-md text-sm">
+                    💡 Center yourself in frame
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Real-time Metrics */}
+          {metrics && !metrics.no_face && (
+            <div className="grid grid-cols-3 gap-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+              <div className="text-center">
+                <p className="text-xs text-gray-600 mb-1">Confidence</p>
+                <div className="relative w-16 h-16 mx-auto">
+                  <svg className="transform -rotate-90 w-16 h-16">
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r="28"
+                      stroke="#e5e7eb"
+                      strokeWidth="6"
+                      fill="none"
+                    />
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r="28"
+                      stroke="#3b82f6"
+                      strokeWidth="6"
+                      fill="none"
+                      strokeDasharray={`${(metrics.eye_contact * 100 * 175.93) / 100} 175.93`}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-lg font-bold text-blue-600">
+                      {(metrics.eye_contact * 100).toFixed(0)}
+                    </span>
                   </div>
                 </div>
+                <p className="text-xs text-gray-500 mt-1">Eye Contact</p>
               </div>
-              <div className="text-2xl font-mono text-blue-400">{formatTime(duration)}</div>
-            </div>
-
-            {/* Question Display */}
-            <div className="glass rounded-xl p-6 mb-6 min-h-[200px] flex items-center border border-white/5">
-              <div>
-                <div className="text-sm text-gray-400 mb-2">
-                  Question {currentQuestionIndex + 1} of {questions.length}
+              <div className="text-center">
+                <p className="text-xs text-gray-600 mb-1">Clarity</p>
+                <div className="relative w-16 h-16 mx-auto">
+                  <svg className="transform -rotate-90 w-16 h-16">
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r="28"
+                      stroke="#e5e7eb"
+                      strokeWidth="6"
+                      fill="none"
+                    />
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r="28"
+                      stroke="#8b5cf6"
+                      strokeWidth="6"
+                      fill="none"
+                      strokeDasharray={`${(metrics.head_stability * 100 * 175.93) / 100} 175.93`}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-lg font-bold text-purple-600">
+                      {(metrics.head_stability * 100).toFixed(0)}
+                    </span>
+                  </div>
                 </div>
-                <p className="text-lg text-gray-200 leading-relaxed">
-                  {questions[currentQuestionIndex]?.question}
+                <p className="text-xs text-gray-500 mt-1">Composure</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-gray-600 mb-1">Engagement</p>
+                <div className="relative w-16 h-16 mx-auto">
+                  <svg className="transform -rotate-90 w-16 h-16">
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r="28"
+                      stroke="#e5e7eb"
+                      strokeWidth="6"
+                      fill="none"
+                    />
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r="28"
+                      stroke="#10b981"
+                      strokeWidth="6"
+                      fill="none"
+                      strokeDasharray={`${((metrics.engagement || metrics.smile) * 100 * 175.93) / 100} 175.93`}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-lg font-bold text-green-600">
+                      {((metrics.engagement || metrics.smile) * 100).toFixed(0)}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Expression</p>
+              </div>
+            </div>
+          )}
+
+          {/* Emotion Detection Display - ALWAYS VISIBLE FOR TESTING */}
+          <div style={{
+            padding: '20px',
+            background: 'linear-gradient(to right, #faf5ff, #fce7f3)',
+            border: '4px solid #9333ea',
+            borderRadius: '8px',
+            marginTop: '16px',
+            marginBottom: '16px',
+            boxShadow: '0 10px 40px rgba(147, 51, 234, 0.5)'
+          }}>
+            <h3 style={{ 
+              fontSize: '24px', 
+              fontWeight: 'bold', 
+              color: '#581c87',
+              marginBottom: '16px'
+            }}>
+              🎭 EMOTION DETECTION - ALWAYS VISIBLE TEST
+            </h3>
+            <p style={{ color: '#1f2937', marginBottom: '8px' }}>
+              isRecording: {isRecording ? 'TRUE ✅' : 'FALSE ❌'}
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <span style={{ fontSize: '48px' }}>
+                {currentEmotion === 'happy' && '😊'}
+                {currentEmotion === 'sad' && '😢'}
+                {currentEmotion === 'angry' && '😠'}
+                {currentEmotion === 'surprise' && '😲'}
+                {currentEmotion === 'fear' && '😨'}
+                {currentEmotion === 'disgust' && '🤢'}
+                {currentEmotion === 'neutral' && '😐'}
+                {!currentEmotion && '⏳'}
+              </span>
+              <div>
+                <p style={{ fontSize: '18px', fontWeight: '600', color: '#1f2937' }}>
+                  Emotion: {currentEmotion || 'Detecting...'}
                 </p>
-                <div className="mt-3">
-                  <span className="text-xs px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">
-                    {questions[currentQuestionIndex]?.type}
+                <p style={{ fontSize: '14px', color: '#6b7280' }}>
+                  Confidence: {emotionConfidence ? emotionConfidence.toFixed(1) : '0.0'}%
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          {/* Debug Display - Remove after testing */}
+          {isRecording && (
+            <div className="p-2 bg-gray-100 rounded text-xs">
+              <p>Debug: currentEmotion = {currentEmotion || 'null'}</p>
+              <p>Debug: emotionConfidence = {emotionConfidence}</p>
+              <p>Debug: isRecording = {isRecording ? 'true' : 'false'}</p>
+              <p>Debug: Condition met = {(currentEmotion && isRecording) ? 'YES' : 'NO'}</p>
+            </div>
+          )}
+          
+          {/* Face Detection Status */}
+          {isRecording && totalFramesProcessed > 10 && (
+            <div className={`p-3 rounded-lg border ${
+              (faceDetectionCount / totalFramesProcessed) >= 0.8 ? 'bg-green-50 border-green-200' :
+              (faceDetectionCount / totalFramesProcessed) >= 0.5 ? 'bg-yellow-50 border-yellow-200' :
+              'bg-red-50 border-red-200'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <svg className={`w-5 h-5 ${
+                    (faceDetectionCount / totalFramesProcessed) >= 0.8 ? 'text-green-600' :
+                    (faceDetectionCount / totalFramesProcessed) >= 0.5 ? 'text-yellow-600' :
+                    'text-red-600'
+                  }`} fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <span className={`text-sm font-semibold ${
+                    (faceDetectionCount / totalFramesProcessed) >= 0.8 ? 'text-green-800' :
+                    (faceDetectionCount / totalFramesProcessed) >= 0.5 ? 'text-yellow-800' :
+                    'text-red-800'
+                  }`}>
+                    Face Detection: {((faceDetectionCount / totalFramesProcessed) * 100).toFixed(0)}%
                   </span>
                 </div>
+                <span className={`text-xs ${
+                  (faceDetectionCount / totalFramesProcessed) >= 0.8 ? 'text-green-600' :
+                  (faceDetectionCount / totalFramesProcessed) >= 0.5 ? 'text-yellow-600' :
+                  'text-red-600'
+                }`}>
+                  {(faceDetectionCount / totalFramesProcessed) >= 0.8 ? 'Excellent' :
+                   (faceDetectionCount / totalFramesProcessed) >= 0.5 ? 'Fair - Improve positioning' :
+                   'Poor - Scores will be 0'}
+                </span>
               </div>
             </div>
-
-            {/* Progress Bar */}
-            <div className="mb-6">
-              <div className="flex justify-between text-sm text-gray-400 mb-2">
-                <span>Progress</span>
-                <span>{Math.round(((currentQuestionIndex + 1) / questions.length) * 100)}%</span>
-              </div>
-              <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full bg-gradient-accent"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
-                  transition={{ duration: 0.5 }}
-                />
-              </div>
-            </div>
+          )}
 
             {/* Controls */}
             <div className="flex space-x-3">
@@ -438,54 +829,20 @@ function LiveInterview() {
               )}
             </div>
 
-            {/* Video Preview */}
-            <div className="relative bg-dark-800 rounded-xl overflow-hidden mb-6 aspect-video">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover"
-              />
-              {!isRecording && answers.length === 0 && (
-                <div className="absolute inset-0 flex items-center justify-center glass">
-                  <div className="text-center">
-                    <p className="text-white text-lg mb-2">Ready to start</p>
-                    <p className="text-gray-400 text-sm">Click Start Interview</p>
-                  </div>
-                </div>
-              )}
-              {isRecording && (
-                <div className="absolute top-4 left-4 flex items-center space-x-2 glass px-3 py-2 rounded-lg">
-                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                  <span className="text-sm font-medium text-white">Recording</span>
-                </div>
-              )}
-            </div>
-
-            {/* Real-time Metrics */}
-            {metrics && !metrics.no_face && (
-              <div className="grid grid-cols-3 gap-3">
-                <div className="glass rounded-lg p-4 text-center border border-white/5">
-                  <div className="text-2xl font-bold text-blue-400">
-                    {(metrics.eye_contact * 100).toFixed(0)}%
-                  </div>
-                  <div className="text-xs text-gray-400 mt-1">Eye Contact</div>
-                </div>
-                <div className="glass rounded-lg p-4 text-center border border-white/5">
-                  <div className="text-2xl font-bold text-purple-400">
-                    {(metrics.head_stability * 100).toFixed(0)}%
-                  </div>
-                  <div className="text-xs text-gray-400 mt-1">Stability</div>
-                </div>
-                <div className="glass rounded-lg p-4 text-center border border-white/5">
-                  <div className="text-2xl font-bold text-pink-400">
-                    {(metrics.smile * 100).toFixed(0)}%
-                  </div>
-                  <div className="text-xs text-gray-400 mt-1">Engagement</div>
-                </div>
-              </div>
-            )}
+          <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200">
+            <p className="text-sm text-gray-700 font-semibold mb-2 flex items-center gap-2">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Interview Tips:
+            </p>
+            <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
+              <li>Look directly at the camera for strong eye contact</li>
+              <li>Position yourself centered in the frame</li>
+              <li>Speak clearly at a natural pace (120-160 words/min)</li>
+              <li>Minimize filler words like "um", "uh", "like"</li>
+              <li>Show natural expressions and maintain good posture</li>
+            </ul>
           </div>
         </motion.div>
       )}
