@@ -40,11 +40,4 @@ passlib[bcrypt]==1.7.4
 google-auth==2.26.2
 google-auth-oauthlib==1.2.0
 google-auth-httplib2==0.2.0
-pyotp==2.9.0
-qrcode[pil]==7.4.2
-
-# AI/ML
-google-generativeai
-
-# Email validation
-email-validator
+bcrypt==4.0.1
