@@ -503,7 +503,7 @@ const LiveInterview = () => {
                     {questions[currentQuestion]}
                   </p>
                 </div>
-              </motion.div>
+              </div>
 
               {/* Segmented Progress Indicator */}
               <div className="mb-8">
