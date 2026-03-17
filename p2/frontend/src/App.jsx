@@ -39,6 +39,7 @@ function App() {
           <Route path="/classic" element={<Landing />} />
           <Route path="/interview-selection" element={<InterviewSelection />} />
           <Route path="/live-interview" element={<LiveInterview />} />
+          <Route path="/home" element={<Home />} />
           <Route path="/upload" element={<Upload />} />
           <Route path="/video-upload" element={<VideoUpload />} />
           <Route path="/test-upload" element={<TestUpload />} />

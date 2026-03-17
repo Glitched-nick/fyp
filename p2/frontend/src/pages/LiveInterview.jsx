@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Video, Mic, MicOff, VideoOff, Play, Square, SkipForward, ArrowLeft, CheckCircle } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
-import Navbar from '../components/Navbar';
+import PolishedNavbar from '../components/PolishedNavbar';
 
 const LiveInterview = () => {
   const location = useLocation();
