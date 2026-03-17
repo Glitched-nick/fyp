@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Menu, X, User, LogIn, Zap } from 'lucide-react';
+import { getAuthToken } from '../utils/authStorage';
 
 const PolishedNavbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -10,7 +11,7 @@ const PolishedNavbar = () => {
   const location = useLocation();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = getAuthToken();
     setIsLoggedIn(!!token);
   }, [location]);
 

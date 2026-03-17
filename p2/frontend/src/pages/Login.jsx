@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { login, googleLogin } from '../api/api';
+import { setAuthToken } from '../utils/authStorage';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -20,7 +21,7 @@ const Login = () => {
 
     try {
       const response = await login(email, password);
-      localStorage.setItem('token', response.access_token);
+      setAuthToken(response.access_token);
       localStorage.setItem('user', JSON.stringify(response.user));
       
       // Force page reload to update AuthContext
@@ -42,7 +43,7 @@ const Login = () => {
       const response = await googleLogin(token);
       console.log('Backend response:', response);
       
-      localStorage.setItem('token', response.access_token);
+      setAuthToken(response.access_token);
       localStorage.setItem('user', JSON.stringify(response.user));
       
       console.log('Navigating to dashboard...');

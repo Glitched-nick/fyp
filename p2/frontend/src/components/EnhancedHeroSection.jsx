@@ -64,8 +64,8 @@ const EnhancedHeroSection = () => {
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-20" />
       
       {/* Radial Glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-gradient-to-r from-violet-600/20 via-indigo-600/20 to-purple-600/20 rounded-full blur-3xl" />
-      <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-gradient-to-l from-blue-600/10 to-cyan-600/10 rounded-full blur-3xl" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[85vw] h-[85vw] max-w-[800px] max-h-[800px] bg-gradient-to-r from-violet-600/20 via-indigo-600/20 to-purple-600/20 rounded-full blur-3xl" />
+      <div className="absolute bottom-0 right-0 w-[70vw] h-[70vw] max-w-[600px] max-h-[600px] bg-gradient-to-l from-blue-600/10 to-cyan-600/10 rounded-full blur-3xl" />
       
       {/* Noise Texture */}
       <div className="absolute inset-0 opacity-[0.015] mix-blend-overlay">

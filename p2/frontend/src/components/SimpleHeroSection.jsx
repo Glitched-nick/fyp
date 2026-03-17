@@ -17,7 +17,7 @@ const SimpleHeroSection = () => {
               {['Software Engineering', 'Data Science', 'Product Management', 'HR Interviews'].map((role) => (
                 <Link
                   key={role}
-                  to="/ai-interview-setup"
+                  to="/interview-selection"
                   className="px-3 py-1.5 bg-slate-800 text-gray-300 rounded-full text-sm border border-slate-700 hover:border-violet-500 hover:bg-slate-700 transition-colors cursor-pointer font-medium"
                 >
                   {role}
@@ -38,18 +38,20 @@ const SimpleHeroSection = () => {
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-6">
-              <Link to="/ai-interview-setup">
-                <button className="w-full sm:w-auto px-8 py-4 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-semibold text-lg transition-colors flex items-center justify-center gap-2">
-                  <Play className="w-5 h-5" />
-                  Start Free Session
-                </button>
+              <Link
+                to="/interview-selection"
+                className="w-full sm:w-auto px-8 py-4 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-semibold text-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <Play className="w-5 h-5" />
+                Start Free Session
               </Link>
 
-              <Link to="/upload">
-                <button className="w-full sm:w-auto px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold text-lg border border-slate-700 transition-colors flex items-center justify-center gap-2">
-                  <Upload className="w-5 h-5" />
-                  Upload Recording
-                </button>
+              <Link
+                to="/upload"
+                className="w-full sm:w-auto px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold text-lg border border-slate-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <Upload className="w-5 h-5" />
+                Upload Recording
               </Link>
             </div>
 

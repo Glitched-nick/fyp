@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { auth } from '../config/firebase'
 import { onAuthStateChanged } from 'firebase/auth'
+import { getAuthToken, setAuthToken, clearAuthToken } from '../utils/authStorage'
 
 const AuthContext = createContext()
 
@@ -11,8 +12,8 @@ export const AuthProvider = ({ children }) => {
   const [isNewUser, setIsNewUser] = useState(false)
 
   useEffect(() => {
-    // Check for existing token in localStorage (backend JWT)
-    const storedToken = localStorage.getItem('token')
+    // Check for existing token in session storage (with localStorage migration fallback).
+    const storedToken = getAuthToken()
     const storedUser = localStorage.getItem('user')
     
     if (storedToken && storedUser) {
@@ -70,8 +71,8 @@ export const AuthProvider = ({ children }) => {
             
             setUser(userData)
 
-            // Store token in localStorage for API calls
-            localStorage.setItem('token', idToken)
+            // Store token for API calls.
+            setAuthToken(idToken)
             localStorage.setItem('user', JSON.stringify({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
@@ -89,7 +90,7 @@ export const AuthProvider = ({ children }) => {
             console.log('User logged out')
             setUser(null)
             setIsNewUser(false)
-            localStorage.removeItem('token')
+            clearAuthToken()
             localStorage.removeItem('user')
             localStorage.removeItem('newUserRedirect')
           }

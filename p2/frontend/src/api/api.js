@@ -1,6 +1,7 @@
 import axios from 'axios'
+import { getAuthToken, clearAuthToken } from '../utils/authStorage'
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
 // Create axios instance with default config
 const api = axios.create({
@@ -14,7 +15,7 @@ const api = axios.create({
 // Request interceptor - Add auth token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token')
+    const token = getAuthToken()
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -40,7 +41,7 @@ api.interceptors.response.use(
     // Handle 401 Unauthorized - token expired
     if (error.response.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
-      localStorage.removeItem('token')
+      clearAuthToken()
       window.location.href = '/login'
       throw new Error('Session expired. Please login again.')
     }

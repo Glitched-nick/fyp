@@ -90,7 +90,7 @@ const PolishedHeroSection = () => {
           opacity: [0.3, 0.4, 0.3]
         }}
         transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[1000px] bg-gradient-to-r from-violet-600/30 via-indigo-600/30 to-purple-600/30 rounded-full blur-3xl"
+        className="absolute top-0 left-1/2 -translate-x-1/2 w-[95vw] h-[95vw] max-w-[1000px] max-h-[1000px] bg-gradient-to-r from-violet-600/30 via-indigo-600/30 to-purple-600/30 rounded-full blur-3xl"
       />
       <motion.div
         animate={{
@@ -98,7 +98,7 @@ const PolishedHeroSection = () => {
           opacity: [0.2, 0.3, 0.2]
         }}
         transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-        className="absolute bottom-0 right-0 w-[800px] h-[800px] bg-gradient-to-l from-blue-600/20 to-cyan-600/20 rounded-full blur-3xl"
+        className="absolute bottom-0 right-0 w-[80vw] h-[80vw] max-w-[800px] max-h-[800px] bg-gradient-to-l from-blue-600/20 to-cyan-600/20 rounded-full blur-3xl"
       />
       
       {/* Subtle Noise Texture */}
