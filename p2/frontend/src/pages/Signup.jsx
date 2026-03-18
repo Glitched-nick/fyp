@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { signup, googleLogin } from '../api/api';
 import { auth } from '../config/firebase';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { setAuthToken } from '../utils/authStorage';
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -49,7 +50,7 @@ const Signup = () => {
         password: formData.password,
         full_name: formData.fullName
       });
-      localStorage.setItem('token', response.access_token);
+      setAuthToken(response.access_token);
       localStorage.setItem('user', JSON.stringify(response.user));
       
       // Force page reload to update AuthContext
@@ -81,7 +82,7 @@ const Signup = () => {
       const idToken = await result.user.getIdToken();
       
       const response = await googleLogin(idToken);
-      localStorage.setItem('token', response.access_token);
+      setAuthToken(response.access_token);
       localStorage.setItem('user', JSON.stringify(response.user));
       
       // Force page reload to update AuthContext

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Sparkles, Menu, X, User, LogIn, Settings } from 'lucide-react';
+import { getAuthToken } from '../utils/authStorage';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -11,7 +12,7 @@ const Navbar = () => {
 
   useEffect(() => {
     // Check if user is logged in
-    const token = localStorage.getItem('token');
+    const token = getAuthToken();
     setIsLoggedIn(!!token);
   }, [location]);
 

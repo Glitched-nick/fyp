@@ -4,7 +4,7 @@ import time
 
 
 class PingCog(commands.Cog, name="ping command"):
-	def __init__(self, bot:commands.bot):
+	def __init__(self, bot:commands.Bot):
 		self.bot = bot
         
 	@commands.command(name = "ping",

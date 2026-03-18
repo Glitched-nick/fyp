@@ -1,7 +1,8 @@
 import React from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { downloadHTMLReport, downloadTextReport } from '../../../utils/pdfGenerator'
+import { getSessionById } from '../../../services/sessionStorage'
 
 // Import existing components (we'll reuse them)
 import CircularScore from '../../../components/CircularScore'
@@ -16,18 +17,36 @@ interface InterviewResultsProps {
 const InterviewResults: React.FC<InterviewResultsProps> = ({ className = '' }) => {
   const location = useLocation()
   const navigate = useNavigate()
+  const { sessionId } = useParams()
   
   // Get data from navigation state
   const { sessionResult, summary, insights, questionSessions } = location.state || {}
+  const [resolvedSessionResult, setResolvedSessionResult] = React.useState<any>(sessionResult || null)
+
+  React.useEffect(() => {
+    if (sessionResult) {
+      setResolvedSessionResult(sessionResult)
+      return
+    }
+
+    if (sessionId) {
+      const storedSession = getSessionById(sessionId)
+      if (storedSession) {
+        setResolvedSessionResult(storedSession)
+      }
+    }
+  }, [sessionResult, sessionId])
+
+  const activeSessionResult = resolvedSessionResult
 
   // Redirect if no data
   React.useEffect(() => {
-    if (!sessionResult) {
+    if (!activeSessionResult) {
       navigate('/live-interview')
     }
-  }, [sessionResult, navigate])
+  }, [activeSessionResult, navigate])
 
-  if (!sessionResult) {
+  if (!activeSessionResult) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center">
         <div className="text-center">
@@ -45,28 +64,41 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({ className = '' }) =
 
   // Prepare data for components
   const overallResults = {
-    overall_score: sessionResult.averageScore,
-    technical_score: Math.round((sessionResult.questionResults.reduce((sum: number, r: any) => 
-      sum + (r.scores?.technicalDepth || 0), 0) / Math.max(1, sessionResult.questionResults.length)) * 10),
-    behavioral_score: Math.round((sessionResult.questionResults.reduce((sum: number, r: any) => 
-      sum + (r.scores?.clarity || 0) + (r.scores?.confidence || 0), 0) / Math.max(2, sessionResult.questionResults.length * 2)) * 10),
-    total_questions: sessionResult.totalQuestions,
-    answered_questions: sessionResult.answeredQuestions,
-    skipped_questions: sessionResult.skippedQuestions,
-    analysis_success_rate: sessionResult.metadata?.analysisSuccessRate || 0,
-    detailed_scores: sessionResult.questionResults.length > 0 ? {
-      relevance: Math.round(sessionResult.questionResults.reduce((sum: number, r: any) => sum + (r.scores?.relevance || 0), 0) / sessionResult.questionResults.length),
-      clarity: Math.round(sessionResult.questionResults.reduce((sum: number, r: any) => sum + (r.scores?.clarity || 0), 0) / sessionResult.questionResults.length),
-      technicalDepth: Math.round(sessionResult.questionResults.reduce((sum: number, r: any) => sum + (r.scores?.technicalDepth || 0), 0) / sessionResult.questionResults.length),
-      confidence: Math.round(sessionResult.questionResults.reduce((sum: number, r: any) => sum + (r.scores?.confidence || 0), 0) / sessionResult.questionResults.length),
-      overall: sessionResult.averageScore
+    overall_score: activeSessionResult.averageScore,
+    technical_score: Math.round((activeSessionResult.questionResults.reduce((sum: number, r: any) => 
+      sum + (r.scores?.technicalDepth || 0), 0) / Math.max(1, activeSessionResult.questionResults.length)) * 10),
+    behavioral_score: Math.round((activeSessionResult.questionResults.reduce((sum: number, r: any) => 
+      sum + (r.scores?.clarity || 0) + (r.scores?.confidence || 0), 0) / Math.max(2, activeSessionResult.questionResults.length * 2)) * 10),
+    total_questions: activeSessionResult.totalQuestions,
+    answered_questions: activeSessionResult.answeredQuestions,
+    skipped_questions: activeSessionResult.skippedQuestions,
+    analysis_success_rate: activeSessionResult.metadata?.analysisSuccessRate || 0,
+    detailed_scores: activeSessionResult.questionResults.length > 0 ? {
+      relevance: Math.round(activeSessionResult.questionResults.reduce((sum: number, r: any) => sum + (r.scores?.relevance || 0), 0) / activeSessionResult.questionResults.length),
+      clarity: Math.round(activeSessionResult.questionResults.reduce((sum: number, r: any) => sum + (r.scores?.clarity || 0), 0) / activeSessionResult.questionResults.length),
+      technicalDepth: Math.round(activeSessionResult.questionResults.reduce((sum: number, r: any) => sum + (r.scores?.technicalDepth || 0), 0) / activeSessionResult.questionResults.length),
+      confidence: Math.round(activeSessionResult.questionResults.reduce((sum: number, r: any) => sum + (r.scores?.confidence || 0), 0) / activeSessionResult.questionResults.length),
+      overall: activeSessionResult.averageScore
     } : { relevance: 0, clarity: 0, technicalDepth: 0, confidence: 0, overall: 0 }
   }
 
   const radarData = overallResults.detailed_scores
 
   // Prepare questions data for accordion
-  const questionsData = questionSessions?.map((session: any, index: number) => ({
+  const fallbackQuestionSessions = activeSessionResult.questionResults?.map((result: any) => ({
+    questionText: result.questionText,
+    transcript: result.answerText,
+    analysis: result,
+    timeUsed: result.timeUsed,
+    allocatedTime: result.allocatedTime,
+    skipped: result.skipped,
+    transcriptionStatus: result.transcriptionStatus,
+    analysisStatus: result.analysisStatus
+  })) || []
+
+  const sourceQuestionSessions = questionSessions || fallbackQuestionSessions
+
+  const questionsData = sourceQuestionSessions.map((session: any, index: number) => ({
     question: session.questionText,
     answer_text: session.transcript || '[Question Skipped]',
     analysis: session.analysis || {
@@ -80,7 +112,7 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({ className = '' }) =
     skipped: session.skipped,
     transcriptionStatus: session.transcriptionStatus,
     analysisStatus: session.analysisStatus
-  })) || []
+  }))
 
   // Action handlers
   const handleRetryInterview = () => {
@@ -92,12 +124,12 @@ const InterviewResults: React.FC<InterviewResultsProps> = ({ className = '' }) =
   }
 
   const handleDownloadReport = () => {
-    if (sessionResult) {
-      const success = downloadHTMLReport(sessionResult)
+    if (activeSessionResult) {
+      const success = downloadHTMLReport(activeSessionResult)
       if (success) {
         alert('Report downloaded successfully!')
       } else {
-        const textSuccess = downloadTextReport(sessionResult)
+        const textSuccess = downloadTextReport(activeSessionResult)
         if (textSuccess) {
           alert('Report downloaded as text file!')
         } else {

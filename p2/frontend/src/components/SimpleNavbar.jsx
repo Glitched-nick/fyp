@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Sparkles, Menu, X, User, LogIn } from 'lucide-react';
+import { getAuthToken } from '../utils/authStorage';
 
 const SimpleNavbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -9,7 +10,7 @@ const SimpleNavbar = () => {
   const location = useLocation();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = getAuthToken();
     setIsLoggedIn(!!token);
   }, [location]);
 

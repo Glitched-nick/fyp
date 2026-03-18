@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { motion } from 'framer-motion'
 import PolishedNavbar from '../components/PolishedNavbar'
 import UploadForm from '../components/UploadForm'
 import AIInterview from '../components/AIInterview'

@@ -10,15 +10,15 @@ export default {
       colors: {
         // Intrex refined color palette
         bg: {
-          primary: '#09090E',    // Near-black with blue undertone
-          secondary: '#0C0D15',  // Slightly lighter for rhythm
-          surface: '#0F1018',    // Card surfaces
+          primary: '#09090E',
+          secondary: '#0C0D15',
+          surface: '#0F1018',
         },
         brand: {
-          primary: '#6D5BFF',    // Electric purple
-          secondary: '#00D4FF',  // Electric cyan
-          success: '#10F0A0',    // Neon mint
-          accent: '#F59E0B',     // Warm amber for testimonials
+          primary: '#6D5BFF',
+          secondary: '#00D4FF',
+          success: '#10F0A0',
+          accent: '#F59E0B',
         },
         text: {
           primary: '#FFFFFF',
@@ -67,9 +67,48 @@ export default {
         },
       },
       fontFamily: {
-        serif: ['Instrument Serif', 'serif'],
-        sans: ['DM Sans', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        serif: ['Instrument Serif', 'Georgia', 'serif'],
+        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        mono: ['Courier New', 'monospace'],
+      },
+      fontSize: {
+        xs: ['0.75rem', { lineHeight: '1rem', letterSpacing: '0.01em' }],
+        sm: ['0.875rem', { lineHeight: '1.25rem', letterSpacing: '0.005em' }],
+        base: ['1rem', { lineHeight: '1.5rem', letterSpacing: '-0.01em' }],
+        lg: ['1.125rem', { lineHeight: '1.75rem', letterSpacing: '-0.01em' }],
+        xl: ['1.25rem', { lineHeight: '1.75rem', letterSpacing: '-0.01em' }],
+        '2xl': ['1.5rem', { lineHeight: '2rem', letterSpacing: '-0.01em' }],
+        '3xl': ['1.875rem', { lineHeight: '2.25rem', letterSpacing: '-0.015em' }],
+        '4xl': ['2.25rem', { lineHeight: '2.5rem', letterSpacing: '-0.015em' }],
+        '5xl': ['3rem', { lineHeight: '1.1', letterSpacing: '-0.02em' }],
+        '6xl': ['3.75rem', { lineHeight: '1.1', letterSpacing: '-0.02em' }],
+        '7xl': ['4.5rem', { lineHeight: '1.1', letterSpacing: '-0.02em' }],
+      },
+      letterSpacing: {
+        tighter: '-0.05em',
+        tight: '-0.025em',
+        normal: '0em',
+        wide: '0.025em',
+        wider: '0.05em',
+        widest: '0.1em',
+      },
+      lineHeight: {
+        tight: '1.1',
+        snug: '1.25',
+        normal: '1.5',
+        relaxed: '1.75',
+        loose: '2',
+      },
+      fontWeight: {
+        thin: '100',
+        extralight: '200',
+        light: '300',
+        normal: '400',
+        medium: '500',
+        semibold: '600',
+        bold: '700',
+        extrabold: '800',
+        black: '900',
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',

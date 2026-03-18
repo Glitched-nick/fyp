@@ -38,8 +38,8 @@ function InterviewDashboard({ className = '' }) {
   }
 
   const handleViewReport = (session) => {
-    // Navigate to results page with session data
-    navigate('/results', { state: { sessionResult: session } })
+    // Route now expects an id to prevent broken result pages.
+    navigate(`/results/${session.sessionId}`)
   }
 
   const handleSortChange = (field, order) => {
@@ -53,7 +53,7 @@ function InterviewDashboard({ className = '' }) {
   }
 
   const handleStartNewInterview = () => {
-    navigate('/interview')
+    navigate('/interview-selection')
   }
 
   if (!analytics) {
