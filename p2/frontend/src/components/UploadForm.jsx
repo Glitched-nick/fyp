@@ -167,6 +167,11 @@ function UploadForm() {
             <div>
               <p className="font-semibold">Error</p>
               <p className="text-sm">{error}</p>
+              {error.toLowerCase().includes('not available') && (
+                <p className="text-xs mt-2 opacity-80">
+                  To enable video analysis, install the optional dependencies in <code className="bg-black/20 px-1 rounded">requirements.txt</code> and restart the backend.
+                </p>
+              )}
             </div>
           </div>
         )}

@@ -2,12 +2,15 @@
 Video processing service using OpenCV and MediaPipe
 Extracts facial behavioral metrics from video frames
 """
-import cv2
 import numpy as np
 from typing import Dict, Optional
-import mediapipe as mp
-from mediapipe.tasks import python
-from mediapipe.tasks.python import vision
+import os
+
+# Suppress TensorFlow/oneDNN noise from mediapipe
+os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
+
+import cv2
 
 # Import DeepFace for emotion detection
 try:
@@ -15,7 +18,6 @@ try:
     DEEPFACE_AVAILABLE = True
 except ImportError:
     DEEPFACE_AVAILABLE = False
-    print("Warning: DeepFace not available. Emotion detection will be disabled.")
 
 # Frame sampling rate (process every Nth frame)
 FRAME_SAMPLE_RATE = 10
