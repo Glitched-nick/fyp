@@ -30,7 +30,9 @@ const Profile = lazy(() => import('./pages/Profile'))
 const TermsOfService = lazy(() => import('./pages/TermsOfService'))
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'))
 const CookiePage = lazy(() => import('./pages/CookiePage'))
+const SecurityPage = lazy(() => import('./pages/SecurityPage'))
 const AboutUs = lazy(() => import('./pages/AboutUs'))
+const Careers = lazy(() => import('./pages/Careers'))
 const Pricing = lazy(() => import('./pages/Pricing'))
 const Settings = lazy(() => import('./pages/Settings'))
 const ComingSoon = lazy(() => import('./pages/ComingSoon'))
@@ -83,11 +85,11 @@ function App() {
                   <Route path="/terms" element={<TermsOfService />} />
                   <Route path="/privacy" element={<PrivacyPage />} />
                   <Route path="/cookies" element={<CookiePage />} />
+                  <Route path="/security" element={<SecurityPage />} />
                   <Route path="/about" element={<AboutUs />} />
+                  <Route path="/careers" element={<Careers />} />
                   <Route path="/pricing" element={<Pricing />} />
                   <Route path="/settings" element={<Settings />} />
-                  <Route path="/careers" element={<ComingSoon title="Careers" />} />
-                  <Route path="/blog" element={<ComingSoon title="Blog" />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>
