@@ -5,7 +5,9 @@ Handles CORS, routing, and application lifecycle
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import Response
+from fastapi.responses import Response, JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
 import os
 from dotenv import load_dotenv
 
@@ -13,7 +15,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Import routers
-from routers import ai_interview, auth, mfa, qr, upload, results
+from routers import ai_interview, auth, mfa, qr, upload, results, advanced_resume
 # live router remains disabled (requires heavy video deps + WebSocket session state)
 # from routers import live
 from database import engine, Base
@@ -26,6 +28,17 @@ app = FastAPI(
     description="AI-powered interview analysis system",
     version="1.0.0"
 )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    # Provide a clearer error for multipart/form-data uploads
+    return JSONResponse(
+        status_code=HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "detail": "Invalid request format. For file uploads ensure Content-Type is multipart/form-data and include 'file' field.",
+            "errors": exc.errors(),
+        },
+    )
 
 # CORS configuration for React frontend
 app.add_middleware(
@@ -52,6 +65,7 @@ app.include_router(qr.router, prefix="/api", tags=["qr"])
 app.include_router(upload.router, prefix="/api", tags=["upload"])
 app.include_router(results.router, prefix="/api", tags=["results"])
 app.include_router(ai_interview.router, prefix="/api", tags=["ai-interview"])
+app.include_router(advanced_resume.router, tags=["resume-analysis"])
 # live router disabled (requires opencv, mediapipe, whisper + WebSocket session state)
 # app.include_router(live.router, prefix="/api", tags=["live"])
 
