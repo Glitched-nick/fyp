@@ -6,10 +6,10 @@ const PremiumFooter = () => {
   const currentYear = new Date().getFullYear();
 
   const socialLinks = [
-    { icon: Twitter, href: '#', label: 'Twitter' },
-    { icon: Linkedin, href: '#', label: 'LinkedIn' },
-    { icon: Github, href: '#', label: 'GitHub' },
-    { icon: Mail, href: '#', label: 'Email' },
+    { icon: Twitter, href: 'https://x.com/PaayushSha44087', label: 'X (Twitter)', external: true },
+    { icon: Linkedin, href: 'https://www.linkedin.com/in/utkarsh-rai-698a57220/', label: 'LinkedIn', external: true },
+    { icon: Github, href: 'https://github.com/Raman156/fyp', label: 'GitHub', external: true },
+    { icon: Mail, href: 'mailto:sharmapaayush@gmail.com', label: 'Email' },
   ];
 
   const footerLinks = {
@@ -17,19 +17,19 @@ const PremiumFooter = () => {
       { label: 'Live Interview', href: '/live-interview' },
       { label: 'Upload Recording', href: '/upload' },
       { label: 'Dashboard', href: '/dashboard' },
-      { label: 'Pricing', href: '#' },
+      { label: 'Pricing', href: '/pricing' },
     ],
     Company: [
-      { label: 'About', href: '#' },
-      { label: 'Blog', href: '#' },
-      { label: 'Careers', href: '#' },
-      { label: 'Contact', href: '#' },
+      { label: 'About', href: '/about' },
+      { label: 'Blog', href: 'https://www.blogger.com/u/1/profile/07512910352667443882', external: true },
+      { label: 'Careers', href: '/careers' },
+      { label: 'Contact', href: 'https://www.linkedin.com/in/utkarsh-rai-698a57220/', external: true },
     ],
     Legal: [
-      { label: 'Privacy', href: '#' },
-      { label: 'Terms', href: '#' },
-      { label: 'Security', href: '#' },
-      { label: 'Cookies', href: '#' },
+      { label: 'Privacy', href: '/privacy' },
+      { label: 'Terms', href: '/terms' },
+      { label: 'Security', href: '/security' },
+      { label: 'Cookies', href: '/cookies' },
     ],
   };
 
@@ -79,8 +79,9 @@ const PremiumFooter = () => {
                   <a
                     key={social.label}
                     href={social.href}
-                    className="w-10 h-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-text-secondary hover:text-white hover:border-brand-primary hover:bg-brand-primary/10 transition-all duration-300 group"
-                    title={social.label}
+                    {...(social.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                    aria-label={social.label}
+                    className="w-10 h-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-text-secondary hover:text-white hover:border-brand-primary hover:bg-brand-primary/10 hover:scale-110 transition-all duration-300 group"
                   >
                     <Icon className="w-4 h-4 group-hover:scale-110 transition-transform" />
                   </a>
@@ -96,13 +97,25 @@ const PremiumFooter = () => {
               <ul className="space-y-3">
                 {links.map((link) => (
                   <li key={link.label}>
-                    <Link
-                      to={link.href}
-                      className="text-text-secondary hover:text-white transition-colors duration-300 text-sm relative group"
-                    >
-                      {link.label}
-                      <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-brand-primary group-hover:w-full transition-all duration-300" />
-                    </Link>
+                    {link.external ? (
+                      <a
+                        href={link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-text-secondary hover:text-white transition-colors duration-300 text-sm relative group inline-block"
+                      >
+                        {link.label}
+                        <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-brand-primary group-hover:w-full transition-all duration-300" />
+                      </a>
+                    ) : (
+                      <Link
+                        to={link.href}
+                        className="text-text-secondary hover:text-white transition-colors duration-300 text-sm relative group inline-block"
+                      >
+                        {link.label}
+                        <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-brand-primary group-hover:w-full transition-all duration-300" />
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -119,9 +132,14 @@ const PremiumFooter = () => {
             © {currentYear} Intrex. Made with precision for ambitious professionals.
           </p>
           <div className="flex items-center gap-6 text-sm text-text-secondary">
-            <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
-            <a href="#" className="hover:text-white transition-colors">Contact</a>
+            <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
+            <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
+            <a
+              href="https://www.linkedin.com/in/utkarsh-rai-698a57220/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-white transition-colors"
+            >Contact</a>
           </div>
         </div>
       </div>
