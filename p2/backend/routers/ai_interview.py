@@ -266,18 +266,31 @@ async def submit_answer(
         
         # Get answer text
         if answer_audio:
+            print(f"Received audio file: {answer_audio.filename}, size: {answer_audio.file.tell() if hasattr(answer_audio, 'file') else 'unknown'}")
             # Transcribe audio
             temp_audio_path = None
             try:
                 # Save audio temporarily
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as temp_file:
                     content = await answer_audio.read()
+                    print(f"Audio content size: {len(content)} bytes")
                     temp_file.write(content)
                     temp_audio_path = temp_file.name
                 
                 # Transcribe
+                print(f"Starting transcription for file: {temp_audio_path}")
                 transcript_data = transcribe_audio(temp_audio_path)
-                answer_text = transcript_data["text"]
+                transcribed_text = transcript_data["text"]
+                print(f"Transcription result: '{transcribed_text}'")
+                
+                # Use transcribed text if available, otherwise use provided text or fallback
+                if transcribed_text and transcribed_text.strip():
+                    answer_text = transcribed_text
+                elif answer_text:
+                    print("Using provided answer_text as fallback")
+                else:
+                    print("Transcription returned empty text, using fallback")
+                    answer_text = "[Audio transcription failed - unable to process audio]"
                 
             finally:
                 if temp_audio_path and os.path.exists(temp_audio_path):
