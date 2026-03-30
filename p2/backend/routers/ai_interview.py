@@ -266,22 +266,42 @@ async def submit_answer(
         
         # Get answer text
         if answer_audio:
-            # Transcribe audio
-            temp_audio_path = None
+            temp_webm_path = None
+            temp_wav_path = None
             try:
-                # Save audio temporarily
+                # Save raw browser audio (.webm) temporarily
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as temp_file:
                     content = await answer_audio.read()
                     temp_file.write(content)
-                    temp_audio_path = temp_file.name
-                
-                # Transcribe
-                transcript_data = transcribe_audio(temp_audio_path)
+                    temp_webm_path = temp_file.name
+
+                # Convert .webm → .wav so Whisper can decode it
+                import shutil, subprocess
+                # Ensure bundled ffmpeg alias is on PATH (same as audio_processing does at import)
+                from services.audio_processing import _ensure_ffmpeg_on_path
+                _ensure_ffmpeg_on_path()
+                temp_wav_path = temp_webm_path.replace(".webm", ".wav")
+                ffmpeg_cmd = shutil.which("ffmpeg")
+
+                if ffmpeg_cmd:
+                    subprocess.run(
+                        [ffmpeg_cmd, "-y", "-i", temp_webm_path,
+                         "-ar", "16000", "-ac", "1", "-f", "wav", temp_wav_path],
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True,
+                        creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                    )
+                    transcribe_path = temp_wav_path
+                else:
+                    # FFmpeg not available — try passing webm directly (may work on some builds)
+                    transcribe_path = temp_webm_path
+
+                transcript_data = transcribe_audio(transcribe_path)
                 answer_text = transcript_data["text"]
-                
+
             finally:
-                if temp_audio_path and os.path.exists(temp_audio_path):
-                    os.remove(temp_audio_path)
+                for p in [temp_webm_path, temp_wav_path]:
+                    if p and os.path.exists(p):
+                        os.remove(p)
         
         if not answer_text:
             raise HTTPException(status_code=400, detail="No answer provided")
@@ -315,6 +335,8 @@ async def submit_answer(
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to submit answer: {str(e)}")
 
 
