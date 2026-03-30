@@ -270,7 +270,7 @@ async def submit_answer(
             # Transcribe audio
             temp_audio_path = None
             try:
-                # Save audio temporarily
+                # Save raw browser audio (.webm) temporarily
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as temp_file:
                     content = await answer_audio.read()
                     print(f"Audio content size: {len(content)} bytes")
@@ -293,8 +293,9 @@ async def submit_answer(
                     answer_text = "[Audio transcription failed - unable to process audio]"
                 
             finally:
-                if temp_audio_path and os.path.exists(temp_audio_path):
-                    os.remove(temp_audio_path)
+                for p in [temp_webm_path, temp_wav_path]:
+                    if p and os.path.exists(p):
+                        os.remove(p)
         
         if not answer_text:
             raise HTTPException(status_code=400, detail="No answer provided")
@@ -328,6 +329,8 @@ async def submit_answer(
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to submit answer: {str(e)}")
 
 
