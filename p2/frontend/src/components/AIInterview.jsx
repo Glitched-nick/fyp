@@ -292,6 +292,12 @@ function AIInterview() {
       alert('Please record an answer first')
       return
     }
+
+    // Validate audio blob before submitting
+    if (session?.audioBlob && session.audioBlob.size === 0) {
+      alert('Recording appears to be empty. Please try recording again.')
+      return
+    }
     
     setIsSubmitting(true)
     
@@ -307,11 +313,16 @@ function AIInterview() {
         }
       } else {
         // Submit recorded answer
+        console.log('Submitting answer with audio blob size:', session.audioBlob.size)
+        
+        // If we have a transcript from the recording, use it as fallback
+        const fallbackText = session.transcript && session.transcript !== 'pending' ? session.transcript : null
+        
         response = await submitAnswer(
           sessionId,
           currentQuestionIndex,
           session.audioBlob,
-          null,
+          fallbackText,
           session.timeUsed
         )
       }
