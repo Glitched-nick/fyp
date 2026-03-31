@@ -360,6 +360,8 @@ async def submit_answer(
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to submit answer: {str(e)}")
 
 
