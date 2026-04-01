@@ -18,6 +18,7 @@ from database import get_db
 from models import AIInterviewSession, AIInterviewAnswer
 from services.ai_interviewer import ai_interviewer
 from services.audio_processing import transcribe_audio
+from utils.rate_limiter import rate_limit
 
 router = APIRouter()
 
@@ -98,7 +99,8 @@ async def start_ai_interview(
     job_description: str = Form(...),
     num_questions: int = Form(5),
     difficulty: str = Form("intermediate"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _rl: None = Depends(rate_limit(auth_rpm=20, anon_rpm=5, endpoint_tag="ai-interview-start")),
 ):
     """
     Start a new AI interview session
@@ -183,7 +185,8 @@ async def start_ai_interview_role(
     role: str = Form(...),
     num_questions: int = Form(5),
     years_of_experience: int = Form(3),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _rl: None = Depends(rate_limit(auth_rpm=20, anon_rpm=5, endpoint_tag="ai-interview-role")),
 ):
     """Start a free interview flow with pre-generated questions for a role"""
     try:
@@ -244,7 +247,8 @@ async def submit_answer(
     answer_audio: UploadFile = File(None),
     answer_text: str = Form(None),
     answer_duration: float = Form(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _rl: None = Depends(rate_limit(auth_rpm=30, anon_rpm=5, endpoint_tag="submit-answer")),
 ):
     """
     Submit an answer for a specific question

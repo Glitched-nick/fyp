@@ -24,6 +24,7 @@ from utils.auth import (
 )
 from utils.file_validation import FileValidator
 from services.resume_analyzer import ResumeAnalyzer
+from utils.rate_limiter import rate_limit
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
@@ -549,7 +550,8 @@ async def upload_resume(
 @router.post("/upload-resume-anonymous", response_model=ResumeUploadResponse)
 async def upload_resume_anonymous(
     file: UploadFile = File(None),
-    field: Optional[str] = Form(None),  # Accept as Form field, not query param
+    field: Optional[str] = Form(None),
+    _rl: None = Depends(rate_limit(auth_rpm=20, anon_rpm=5, endpoint_tag="resume-upload")),
 ):
     """Upload and analyze resume anonymously without requiring user authentication"""
 
