@@ -14,6 +14,7 @@ import TranscriptionStatus from './TranscriptionStatus'
 import AnalysisDisplay from './AnalysisDisplay'
 import SessionSummary from './SessionSummary'
 import ResultsPage from './ResultsPage'
+import LiveFacialAnalysis from './LiveFacialAnalysis'
 
 // Speak text using the Web Speech API
 function speakQuestion(text) {
@@ -52,6 +53,7 @@ function AIInterview() {
   const [sessionSummary, setSessionSummary] = useState(null)
   const [performanceInsights, setPerformanceInsights] = useState(null)
   const [finalSessionResult, setFinalSessionResult] = useState(null)
+  const [facialAnalysis, setFacialAnalysis] = useState(null) // live facial + emotion data
   const [serviceStatus, setServiceStatus] = useState({
     checking: true,
     apiConnected: false,
@@ -89,6 +91,7 @@ function AIInterview() {
     setSessionSummary(null)
     setPerformanceInsights(null)
     setFinalSessionResult(null)
+    setFacialAnalysis(null)
   }
 
   const handleGoToDashboard = () => {
@@ -818,6 +821,15 @@ function AIInterview() {
               </label>
             </div>
 
+            {/* ── Live Webcam Analysis (center) ── */}
+            <LiveFacialAnalysis
+              sessionId={sessionId}
+              active={step === 'interview'}
+              onEmotionUpdate={(history) => {
+                setFacialAnalysis(prev => ({ ...prev, emotionHistory: history }))
+              }}
+            />
+
             {/* Question Timer */}
             <QuestionTimer
               questionId={getCurrentQuestionId()}
@@ -1034,6 +1046,7 @@ function AIInterview() {
               answers={answers}
               sessionSummary={sessionSummary}
               performanceInsights={performanceInsights}
+              facialAnalysis={facialAnalysis}
               onRetryInterview={handleRetryInterview}
               onGoToDashboard={handleGoToDashboard}
               onDownloadReport={handleDownloadReport}
