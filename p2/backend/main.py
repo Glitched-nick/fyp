@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import Response, JSONResponse
 from fastapi.exceptions import RequestValidationError
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
 import os
 from dotenv import load_dotenv
@@ -16,7 +17,9 @@ load_dotenv()
 
 # Import routers
 from routers import ai_interview, auth, mfa, qr, upload, results, advanced_resume, live
+
 from database import engine, Base
+from utils.rate_limiter import rate_limit_headers_middleware
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -51,6 +54,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Inject X-RateLimit-* headers into responses
+app.add_middleware(BaseHTTPMiddleware, dispatch=rate_limit_headers_middleware)
 
 # Create uploads directory if it doesn't exist
 os.makedirs("uploads", exist_ok=True)

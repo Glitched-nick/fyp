@@ -11,6 +11,7 @@ import os
 from database import get_db
 from models import User
 from utils.auth import get_current_active_user
+from utils.rate_limiter import rate_limit
 from services.advanced_resume_analyzer import AdvancedResumeAnalyzer, VoiceFeedbackFormatter
 
 router = APIRouter(prefix="/api/resume", tags=["resume-analysis"])
@@ -21,7 +22,8 @@ async def analyze_resume_advanced(
     resume_text: str = Body(..., description="Resume text to analyze"),
     job_profile: Optional[str] = Body(None, description="Target job profile (optional)"),
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _rl: None = Depends(rate_limit(auth_rpm=30, anon_rpm=5, endpoint_tag="resume-analyze")),
 ):
     """
     Advanced resume analysis with multiple scoring dimensions
