@@ -11,20 +11,16 @@ import os
 import tempfile
 from typing import Optional
 import time
-from concurrent.futures import ThreadPoolExecutor
-import asyncio
 
 from database import get_db
-from services.video_processing import process_frame_facial, detect_emotion_from_frame
+from services.video_processing import process_frame_facial, reset_blink_tracker
 from services.audio_processing import process_audio
 from services.scoring_engine import compute_confidence_score, generate_feedback
 from models import Interview
 
 router = APIRouter()
 
-# Thread pool for running DeepFace without blocking the async loop
-_emotion_executor = ThreadPoolExecutor(max_workers=2)
-
+# Thread pool no longer needed — emotion runs in its own daemon thread inside video_processing
 # Store active sessions (in-memory for now, but with persistence fallback)
 active_sessions = {}
 
@@ -82,6 +78,8 @@ async def live_interview(websocket: WebSocket):
     await websocket.accept()
     print(f"WebSocket connection accepted")
     
+    reset_blink_tracker()  # fresh blink count per session
+
     session_id = None
     frame_count = 0
     accumulated_metrics = {
@@ -91,10 +89,13 @@ async def live_interview(websocket: WebSocket):
         "engagement": [],
         "face_detected": [],
         "centering": [],
-        "emotions": [],          # list of label strings
-        "emotion_history": [],   # list of {emotion, confidence, ts}
+        "attention": [],
+        "blink_rates": [],
+        "head_yaw": [],
+        "head_pitch": [],
+        "emotions": [],
+        "emotion_history": [],
     }
-    _pending_emotion_future = None  # track in-flight DeepFace task
     
     try:
         while True:
@@ -126,59 +127,47 @@ async def live_interview(websocket: WebSocket):
                 frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
                 if frame_count % 3 == 0:
-                    # Run fast facial metrics synchronously (OpenCV only, ~5ms)
-                    metrics = process_frame_facial(frame, detect_emotion=False)
-
-                    # Check if a pending DeepFace result is ready (non-blocking)
-                    emotion_result = None
-                    if _pending_emotion_future is not None and _pending_emotion_future.done():
-                        try:
-                            emotion_result = _pending_emotion_future.result()
-                        except Exception:
-                            emotion_result = None
-                        _pending_emotion_future = None
-
-                    # Schedule a new DeepFace task every ~10 processed frames (~2s)
-                    if _pending_emotion_future is None and frame_count % 30 == 0:
-                        loop = asyncio.get_event_loop()
-                        _pending_emotion_future = loop.run_in_executor(
-                            _emotion_executor,
-                            detect_emotion_from_frame,
-                            frame.copy()
-                        )
+                    # process_frame_facial now handles emotion internally via background thread
+                    metrics = process_frame_facial(frame, detect_emotion=True)
 
                     if metrics:
                         accumulated_metrics["eye_contact"].append(metrics["eye_contact"])
                         accumulated_metrics["head_stability"].append(metrics["head_stability"])
-                        accumulated_metrics["smile"].append(metrics["smile"])
+                        accumulated_metrics["smile"].append(metrics.get("smile", 0))
                         accumulated_metrics["engagement"].append(metrics.get("engagement", 0.5))
                         accumulated_metrics["centering"].append(metrics.get("centering", 0.5))
+                        accumulated_metrics["attention"].append(metrics.get("attention", 0.5))
+                        accumulated_metrics["blink_rates"].append(metrics.get("blink_rate", 0))
+                        pose = metrics.get("head_pose", {})
+                        accumulated_metrics["head_yaw"].append(pose.get("yaw", 0))
+                        accumulated_metrics["head_pitch"].append(pose.get("pitch", 0))
                         accumulated_metrics["face_detected"].append(1)
 
                         response_data = {
-                            "eye_contact": metrics["eye_contact"],
+                            "eye_contact":    metrics["eye_contact"],
                             "head_stability": metrics["head_stability"],
-                            "smile": metrics["smile"],
-                            "engagement": metrics.get("engagement", 0.5),
-                            "centering": metrics.get("centering", 0.5),
+                            "smile":          metrics.get("smile", 0),
+                            "engagement":     metrics.get("engagement", 0.5),
+                            "centering":      metrics.get("centering", 0.5),
+                            "attention":      metrics.get("attention", 0.5),
+                            "blink_rate":     metrics.get("blink_rate", 0),
+                            "head_pose":      metrics.get("head_pose", {}),
+                            "mouth_open":     metrics.get("mouth_open", 0),
                         }
 
-                        # Attach emotion result if one just came back from the thread pool
-                        if emotion_result:
-                            label = emotion_result["dominant_emotion"]
-                            conf = float(emotion_result["confidence"])
+                        # Attach emotion if the background thread produced one
+                        if "emotion" in metrics:
+                            label = metrics["emotion"]
+                            conf  = metrics.get("emotion_confidence", 0)
+                            scores = metrics.get("emotion_scores", {})
                             accumulated_metrics["emotions"].append(label)
                             accumulated_metrics["emotion_history"].append({
-                                "emotion": label,
-                                "confidence": conf,
-                                "ts": time.time(),
+                                "emotion": label, "confidence": conf, "ts": time.time()
                             })
-                            response_data["emotion"] = label
+                            response_data["emotion"]           = label
                             response_data["emotion_confidence"] = conf
-                            response_data["all_emotions"] = {
-                                k: float(v) for k, v in emotion_result["emotions"].items()
-                            }
-                            print(f"🎭 Emotion (threaded): {label} ({conf:.1f}%)")
+                            response_data["all_emotions"]      = scores
+                            print(f"🎭 Emotion: {label} ({conf:.1f}%)")
 
                         await websocket.send_json({"type": "metrics", "data": response_data})
                     else:
@@ -203,11 +192,15 @@ async def live_interview(websocket: WebSocket):
             # Only calculate metrics if face was detected in at least 50% of frames
             if accumulated_metrics["eye_contact"] and face_presence >= 0.5:
                 final_metrics = {
-                    "eye_contact_score": float(np.mean(accumulated_metrics["eye_contact"])),
-                    "head_stability_score": float(np.mean(accumulated_metrics["head_stability"])),
-                    "smile_score": float(np.mean(accumulated_metrics["smile"])),
-                    "engagement_score": float(np.mean(accumulated_metrics["engagement"])),
-                    "face_presence_percentage": face_presence
+                    "eye_contact_score":      float(np.mean(accumulated_metrics["eye_contact"])),
+                    "head_stability_score":   float(np.mean(accumulated_metrics["head_stability"])),
+                    "smile_score":            float(np.mean(accumulated_metrics["smile"])),
+                    "engagement_score":       float(np.mean(accumulated_metrics["engagement"])),
+                    "attention_score":        float(np.mean(accumulated_metrics["attention"])) if accumulated_metrics["attention"] else 0.0,
+                    "avg_blink_rate":         float(np.mean(accumulated_metrics["blink_rates"])) if accumulated_metrics["blink_rates"] else 0.0,
+                    "avg_head_yaw":           float(np.mean(np.abs(accumulated_metrics["head_yaw"]))) if accumulated_metrics["head_yaw"] else 0.0,
+                    "avg_head_pitch":         float(np.mean(np.abs(accumulated_metrics["head_pitch"]))) if accumulated_metrics["head_pitch"] else 0.0,
+                    "face_presence_percentage": face_presence,
                 }
                 print(f"Valid metrics calculated - Face presence: {face_presence*100:.1f}%")
             else:

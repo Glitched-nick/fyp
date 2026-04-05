@@ -42,7 +42,7 @@ function FacialAnalysisSection({ facialAnalysis }) {
         .map(([emotion, pct]) => ({ emotion, pct, fill: EMOTION_COLOR_MAP[emotion] || '#64748b' }))
     : []
 
-  if (!chartData.length) return null
+  if (!chartData.length && !facialAnalysis?.avgMetrics) return null
 
   return (
     <motion.div
@@ -123,6 +123,42 @@ function FacialAnalysisSection({ facialAnalysis }) {
           </p>
         </div>
       </div>
+
+      {/* Avg facial metrics grid */}
+      {facialAnalysis?.avgMetrics && (() => {
+        const m = facialAnalysis.avgMetrics
+        const pct = v => Math.round((v || 0) * 100)
+        const items = [
+          { label: 'Eye Contact',    value: pct(m.eye_contact),    color: '#3b82f6', icon: '👁' },
+          { label: 'Head Stability', value: pct(m.head_stability), color: '#22c55e', icon: '🧠' },
+          { label: 'Engagement',     value: pct(m.engagement),     color: '#a855f7', icon: '⚡' },
+          { label: 'Attention',      value: pct(m.attention),      color: '#06b6d4', icon: '🎯' },
+          { label: 'Centering',      value: pct(m.centering),      color: '#f59e0b', icon: '📐' },
+        ]
+        return (
+          <div>
+            <p className="text-sm text-gray-400 mb-3">Session Averages</p>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              {items.map(({ label, value, color, icon }) => (
+                <div key={label} className="bg-slate-800/60 rounded-xl p-3 text-center">
+                  <div className="text-xl mb-1">{icon}</div>
+                  <div className="text-2xl font-bold text-white">{value}%</div>
+                  <div className="text-xs text-gray-400 mt-0.5">{label}</div>
+                  <div className="mt-2 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all" style={{ width: `${value}%`, backgroundColor: color }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            {m.avg_blink_rate > 0 && (
+              <p className="text-xs text-gray-500 mt-2">
+                Avg blink rate: <span className={`font-medium ${m.avg_blink_rate < 10 ? 'text-amber-400' : m.avg_blink_rate > 30 ? 'text-red-400' : 'text-green-400'}`}>{m.avg_blink_rate} bpm</span>
+                {m.avg_blink_rate < 10 ? ' — low (possible stress)' : m.avg_blink_rate > 30 ? ' — high (possible nervousness)' : ' — normal range'}
+              </p>
+            )}
+          </div>
+        )
+      })()}
     </motion.div>
   )
 }
